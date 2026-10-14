@@ -26,6 +26,10 @@ public class Registration implements Serializable {
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	Long numRegistration;
 	int numWeek;
+	@Column(nullable = false, columnDefinition = "boolean default false")
+	boolean cancelled;
+	@ManyToOne
+	PlanningSlot planningSlot;
 
 	@JsonIgnore
 	@ManyToOne
@@ -33,4 +37,9 @@ public class Registration implements Serializable {
 	@JsonIgnore
 	@ManyToOne
 	Course course;
+
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+	public Long getSkierId() { return skier == null ? null : skier.getNumSkier(); }
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+	public Long getCourseId() { return course == null ? null : course.getNumCourse(); }
 }

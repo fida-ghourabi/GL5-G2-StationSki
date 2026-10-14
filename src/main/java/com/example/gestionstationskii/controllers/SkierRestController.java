@@ -17,6 +17,16 @@ public class SkierRestController {
 
     private final ISkierServices skierServices;
 
+    @Operation(summary = "Modifier les informations personnelles d'un skieur")
+    @PutMapping("/update")
+    public Skier update(@RequestBody Skier skier) { return skierServices.updateSkier(skier); }
+
+    @Operation(summary = "Rechercher par nom et ville ; pagination indexée à zéro")
+    @GetMapping("/search")
+    public org.springframework.data.domain.Page<Skier> search(@RequestParam(defaultValue = "") String name,
+            @RequestParam(defaultValue = "") String city, @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) { return skierServices.search(name, city, page, size); }
+
     @Operation(description = "Add Skier")
     @PostMapping("/add")
     public Skier addSkier(@RequestBody Skier skier){
@@ -44,7 +54,7 @@ public class SkierRestController {
     }
     @Operation(description = "retrieve Skiers By Subscription Type")
     @GetMapping("/getSkiersBySubscription")
-    public List<Skier> retrieveSkiersBySubscriptionType(TypeSubscription typeSubscription) {
+    public List<Skier> retrieveSkiersBySubscriptionType(@RequestParam TypeSubscription typeSubscription) {
         return skierServices.retrieveSkiersBySubscriptionType(typeSubscription);
     }
     @Operation(description = "Retrieve Skier by Id")

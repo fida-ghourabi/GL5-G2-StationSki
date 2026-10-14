@@ -3,6 +3,9 @@ import com.example.gestionstationskii.entities.*;
 import java.util.List;
 
 public interface IPisteServices {
+    Piste updatePiste(Piste piste);
+    List<Piste> search(Color color);
+    java.util.Set<Skier> skiers(Long id);
 
     List<Piste> retrieveAllPistes();
 

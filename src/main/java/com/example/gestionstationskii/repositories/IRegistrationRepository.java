@@ -9,13 +9,17 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 @Repository
 
-public interface IRegistrationRepository extends CrudRepository<Registration, Long> {
+public interface IRegistrationRepository extends org.springframework.data.jpa.repository.JpaRepository<Registration, Long> {
+    List<Registration> findBySkier_NumSkier(Long skierId);
+    List<Registration> findByCourse_NumCourse(Long courseId);
+    List<Registration> findByPlanningSlot_Id(Long slotId);
+    long countByPlanningSlot_Id(Long slotId);
+    boolean existsBySkier_NumSkier(Long skierId);
+    boolean existsByCourse_NumCourse(Long courseId);
 
     long countByCourseAndNumWeek(Course course, int numWeek);
-    @Query("select reg.numWeek from Registration reg " +
-            "join Instructor ins " +
-            "on reg.course member ins.courses " +
-            "where ins.numInstructor = :idIns and reg.course.support = :support")
+    @Query("select distinct reg.numWeek from Instructor ins join ins.courses c, Registration reg " +
+            "where reg.course = c and ins.numInstructor = :idIns and c.support = :support and reg.cancelled = false")
     List<Integer> numWeeksCourseOfInstructorBySupport(@Param("idIns") Long numInstructor, @Param("support") Support support);
 
     @Query("select count(distinct r) from Registration r " +

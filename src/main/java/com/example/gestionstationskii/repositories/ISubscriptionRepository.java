@@ -12,18 +12,21 @@ import java.util.List;
 import java.util.Set;
 @Repository
 
-public interface ISubscriptionRepository extends CrudRepository<Subscription, Long> {
+public interface ISubscriptionRepository extends org.springframework.data.jpa.repository.JpaRepository<Subscription, Long> {
+    @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Subscription s where s.numSub = :id")
+    java.util.Optional<Subscription> lockById(@Param("id") Long id);
 
     @Query("select s from Subscription s where s.typeSub = :typeS order by s.startDate")
     Set<Subscription> findByTypeSubOrderByStartDateAsc(@Param("typeS") TypeSubscription typeSub);
 
     List<Subscription> getSubscriptionsByStartDateBetween(LocalDate date1, LocalDate date2);
 
-    @Query("select distinct s from Subscription s where s.endDate <= CURRENT_TIME order by s.endDate")
+    @Query("select distinct s from Subscription s where s.endDate <= CURRENT_DATE order by s.endDate")
     List<Subscription> findDistinctOrderByEndDateAsc();
 
 
-    @Query("select (sum(s.price))/(count(s)) from Subscription s where s.typeSub = ?1")
+    @Query("select coalesce(sum(s.price), 0) from Subscription s where s.typeSub = ?1 and s.startDate <= CURRENT_DATE and s.endDate > CURRENT_DATE")
     Float recurringRevenueByTypeSubEquals(TypeSubscription typeSub);
 
 

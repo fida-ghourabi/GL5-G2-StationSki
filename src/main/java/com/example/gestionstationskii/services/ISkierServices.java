@@ -5,6 +5,8 @@ import com.example.gestionstationskii.entities.*;
 import java.util.List;
 
 public interface ISkierServices {
+    Skier updateSkier(Skier skier);
+    org.springframework.data.domain.Page<Skier> search(String name, String city, int page, int size);
 
 	List<Skier> retrieveAllSkiers();
 

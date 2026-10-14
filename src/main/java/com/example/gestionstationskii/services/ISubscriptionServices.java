@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Set;
 
 public interface ISubscriptionServices {
+    void removeSubscription(Long id);
+    String status(Long id, LocalDate asOf);
 
 	Subscription addSubscription(Subscription subscription);
 

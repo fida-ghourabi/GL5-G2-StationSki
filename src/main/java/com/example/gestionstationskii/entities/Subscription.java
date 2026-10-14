@@ -27,7 +27,8 @@ public class Subscription implements Serializable {
 	LocalDate startDate;
 	LocalDate endDate;
 	Float price;
-//	@Enumerated(EnumType.STRING)
+	// Preserve existing ordinal values (ANNUAL=0, MONTHLY=1, SEMESTRIEL=2).
+	@Enumerated(EnumType.ORDINAL)
 	TypeSubscription typeSub;
 
 }

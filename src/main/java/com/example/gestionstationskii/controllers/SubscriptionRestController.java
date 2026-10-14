@@ -19,6 +19,17 @@ public class SubscriptionRestController {
 
     private final ISubscriptionServices subscriptionServices;
 
+    @Operation(summary = "Supprimer un abonnement sans skieur ni paiement")
+    @DeleteMapping("/delete/{id}")
+    public void delete(@PathVariable Long id) { subscriptionServices.removeSubscription(id); }
+
+    @Operation(summary = "Statut calculé de l'abonnement à une date donnée")
+    @GetMapping("/{id}/status")
+    public String status(@PathVariable Long id,
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate asOf) {
+        return subscriptionServices.status(id, asOf);
+    }
+
     @Operation(description = "Add Subscription ")
     @PostMapping("/add")
     public Subscription addSubscription(@RequestBody Subscription subscription){
@@ -42,8 +53,8 @@ public class SubscriptionRestController {
     }
     @Operation(description = "Retrieve Subscriptions created between two dates")
     @GetMapping("/all/{date1}/{date2}")
-    public List<Subscription> getSubscriptionsByDates(@PathVariable("date1") LocalDate startDate,
-                                                      @PathVariable("date2") LocalDate endDate){
+    public List<Subscription> getSubscriptionsByDates(@PathVariable("date1") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
+                                                      @PathVariable("date2") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate){
         return subscriptionServices.retrieveSubscriptionsByDates(startDate, endDate);
     }
 

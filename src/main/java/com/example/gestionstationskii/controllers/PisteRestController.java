@@ -19,6 +19,18 @@ public class PisteRestController {
 
     private final IPisteServices pisteServices;
 
+    @Operation(summary = "Modifier une piste")
+    @PutMapping("/update")
+    public Piste update(@RequestBody Piste piste) { return pisteServices.updatePiste(piste); }
+
+    @Operation(summary = "Filtrer les pistes par couleur / difficulté")
+    @GetMapping("/search")
+    public List<Piste> search(@RequestParam(required = false) Color color) { return pisteServices.search(color); }
+
+    @Operation(summary = "Consulter les skieurs affectés à une piste")
+    @GetMapping("/{id}/skiers")
+    public java.util.Set<Skier> skiers(@PathVariable Long id) { return pisteServices.skiers(id); }
+
     @Operation(description = "Add Piste")
     @PostMapping("/add")
     public Piste addPiste(@RequestBody Piste piste){

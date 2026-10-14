@@ -18,6 +18,26 @@ public class InstructorRestController {
 
     private final IInstructorServices instructorServices;
 
+    @Operation(summary = "Supprimer un moniteur sans associations")
+    @DeleteMapping("/delete/{id}")
+    public void delete(@PathVariable Long id) { instructorServices.removeInstructor(id); }
+
+    @Operation(summary = "Associer un cours existant à un moniteur")
+    @PutMapping("/{id}/courses/{courseId}")
+    public Instructor assign(@PathVariable Long id, @PathVariable Long courseId) { return instructorServices.assignCourse(id, courseId); }
+
+    @Operation(summary = "Retirer un cours après annulation des créneaux futurs")
+    @DeleteMapping("/{id}/courses/{courseId}")
+    public Instructor unassign(@PathVariable Long id, @PathVariable Long courseId) { return instructorServices.unassignCourse(id, courseId); }
+
+    @Operation(summary = "Lister les cours d'un moniteur")
+    @GetMapping("/{id}/courses")
+    public java.util.Set<Course> courses(@PathVariable Long id) { return instructorServices.courses(id); }
+
+    @Operation(summary = "Rechercher un moniteur par nom ou prénom")
+    @GetMapping("/search")
+    public List<Instructor> search(@RequestParam(defaultValue = "") String name) { return instructorServices.search(name); }
+
     @Operation(description = "Add Instructor")
     @PostMapping("/add")
     public Instructor addInstructor(@RequestBody Instructor instructor){

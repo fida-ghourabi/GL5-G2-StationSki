@@ -103,26 +103,6 @@ Les anciennes routes partielles ne sont pas utilisées pour les nouvelles inscri
 
 Le filtre moniteur des créneaux disponibles est appliqué localement car la route `/available` ne le prend pas. Capacités connues : 1 en individuel, jusqu’à 6 en collectif. L’interface ne déduit pas un nombre de places restantes à partir du simple statut `OPEN`.
 
-## Matériel et locations
-
-| Méthode | Chemin | Paramètres / corps |
-| --- | --- | --- |
-| GET | `/equipment` | Inventaire complet |
-| GET | `/equipment/{id}` | Exemplaire |
-| POST | `/equipment` | `inventoryCode`, `type`, `brand`, `size`, `dailyRate`, `status` |
-| PUT | `/equipment/{id}` | Mêmes champs |
-| DELETE | `/equipment/{id}` | Sans historique |
-| GET | `/equipment/available` | `from`, `to` dates requis ; `type` optionnel |
-| POST | `/rentals` | `skierId`, `equipmentId`, `startDate`, `expectedEndDate` |
-| GET | `/rentals/{id}` | Location |
-| GET | `/rentals/skier/{skierId}` | Historique complet |
-| GET | `/rentals` | `from`, `to` dates requis |
-| PUT | `/rentals/{id}/activate` | Sans corps utile |
-| PUT | `/rentals/{id}/return` | `actualReturnDate` |
-| PUT | `/rentals/{id}/cancel` | Sans corps utile |
-
-Les filtres d’inventaire taille/état et le filtre de statut des locations sont locaux. Les disponibilités, chevauchements, tarifs et montants de location viennent du serveur. Le frontend ne calcule pas un devis supposant une configuration de facturation inconnue.
-
 ## Abonnements
 
 | Méthode | Chemin | Paramètres / corps |
@@ -137,7 +117,7 @@ Les filtres d’inventaire taille/état et le filtre de statut des locations son
 
 La liste globale est composée des trois appels par type. Les statuts de liste sont calculés à partir des dates, selon la même règle de fin exclusive, avec une catégorie visuelle « échéance proche » sous 30 jours ; pas de requête de statut par ligne. Le filtre « actifs » inclut les échéances proches. Un abonnement ayant des paiements est immuable côté backend.
 
-## Paiements et rapports
+## Paiements
 
 | Méthode | Chemin | Paramètres / corps |
 | --- | --- | --- |
@@ -149,27 +129,25 @@ La liste globale est composée des trois appels par type. Les statuts de liste s
 | POST | `/payments/{id}/refunds` | `amount`, `reason` |
 | GET | `/payments/{id}/refunds` | Historique des remboursements |
 | GET | `/payments/{id}/receipt` | DTO du reçu |
-| GET | `/reports/revenue` | `from`, `to` datetime requis |
-| GET | `/reports/subscriptions` | `asOf` date requise |
-| GET | `/reports/courses/occupancy` | `from`, `to` datetime requis |
-| GET | `/reports/registrations` | `from`, `to` datetime requis |
 
-Paiement enregistré en attente, encaissement confirmé par une action distincte. Remboursement avec montant restant et confirmation explicite. Aucun numéro de carte n’est demandé, stocké ou transmis. Le revenu est celui du rapport backend, pas une somme reconstruite des prix d’abonnement ou des locations.
+Paiement enregistré en attente, encaissement confirmé par une action distincte. Remboursement avec montant restant et confirmation explicite. Aucun numéro de carte n’est demandé, stocké ou transmis. Le reçu conserve ses champs JSON et son chemin ; le DTO Java est désormais `PaymentReceipt` dans le domaine paiement.
 
 ## Fonctionnalités accessibles et fonctions sans route
 
-Les onze rubriques métier sont alimentées par des routes existantes, y compris planning, locations, paiements et rapports (elles ne sont plus de simples fonctionnalités futures dans cet état du dépôt).
+Les rubriques conservées sont le tableau de bord, les skieurs, pistes, cours, moniteurs, inscriptions, planning, abonnements et paiements. Les contrôleurs Spring injectent exclusivement les interfaces des huit services métier ; leurs implémentations portent les transactions et validations.
 
-Fonctions sans route, donc non implémentées comme opérations : authentification/rôles, météo, remontées mécaniques, ouverture/fermeture des pistes, modification/suppression des disponibilités, dissociation skieur–piste, suppression de paiements/remboursements, paiement bancaire externe, PDF fiscal, paiement des locations. Les formulaires et indicateurs associés ne sont pas simulés.
+Fonctions sans route, donc non implémentées comme opérations : authentification/rôles, météo, remontées mécaniques, ouverture/fermeture des pistes, modification/suppression des disponibilités, dissociation skieur–piste, suppression de paiements/remboursements, paiement bancaire externe et PDF fiscal. Les formulaires et indicateurs associés ne sont pas simulés.
+
+Les domaines rapports et matériel/location sont retirés : leurs anciens endpoints `/reports/**`, `/equipment/**` et `/rentals/**` ne sont plus exposés. Les appels, composants, modèles et liens Angular associés sont supprimés. Aucune table historique n’est effacée.
 
 ## Points de vigilance
 
 1. **Disponibilité du serveur** : les anciennes difficultés de démarrage/Swagger ne prouvent pas que les routes répondent actuellement. La compilation frontend ne vérifie pas la connexion MySQL ni les réponses HTTP du backend.
 2. **CORS** : passage par le proxy `/stationSki/**` en développement, reverse proxy en production.
-3. **Périodes obligatoires** : pas de liste globale non bornée des inscriptions et locations ; bornes précisées dans les écrans.
+3. **Périodes obligatoires** : pas de liste globale non bornée des inscriptions ; bornes précisées dans les écrans.
 4. **Historique d’inscriptions** : `planningSlot` nullable, `skier`/`course` ignorés en JSON ; utilisation de `skierId` et `courseId`. Les anciens enregistrements sans date ne sont pas inventés dans le calendrier.
 5. **Association moniteur–cours** : un cours a un seul moniteur ; le planning exige l’association avant création et une disponibilité couvrant le créneau.
 6. **Suppressions et modifications** : les protections d’historique produisent des `409` ; elles restent affichées plutôt que traitées comme des succès.
 7. **Monnaie** : absente du contrat backend. Unité d’affichage configurable, aucune conversion.
 8. **Volume** : seule la recherche skieurs est paginée par le serveur. Les autres filtres locaux et lookups nécessitent les listes retournées par l’API ; à faire évoluer côté API pour les grands volumes.
-9. **Compatibilité Java/backend** : aucun fichier Java, propriété serveur, dépendance Maven ou schéma n’est changé par cette implémentation frontend.
+9. **Compatibilité backend** : les chemins, corps et règles des endpoints conservés restent inchangés. Le retrait des domaines ne déclenche aucune migration ni suppression de données ; les références historiques en base restent protégées par leurs contraintes.

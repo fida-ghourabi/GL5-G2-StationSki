@@ -6,7 +6,7 @@ Le connecteur MySQL existant est fixé à `8.0.33` (compatible Java 8) pour ne p
 
 ## Lancer en développement
 
-Prérequis : JDK 8 (ou JDK compatible avec cette version de Lombok), Maven 3.6+ et MySQL 8. Préparer une base `skidb` et un compte MySQL autorisé à l'utiliser. Le projet ne crée plus automatiquement la base.
+Prérequis : JDK 8 ou 11, Maven 3.6+ et MySQL 8. Préparer une base `skidb` et un compte MySQL autorisé à l'utiliser. Le projet ne crée plus automatiquement la base. Exécuter les commandes Maven depuis `backend/`.
 
 Configurer les variables d'environnement, par exemple dans PowerShell :
 
@@ -33,12 +33,22 @@ Les routes annotées sont incluses dans le groupe Swagger ; l'exclusion globale 
 ## Architecture
 
 ```text
-controllers/  →  services/ + interfaces existantes  →  repositories/  →  entities/
+controllers/  →  services/ (I…Services → …ServicesImpl)  →  repositories/  →  entities/
                       ↕
                     dto/
 ```
 
-Les transactions et règles métier restent dans les services. `ApiExceptionHandler` fournit les erreurs JSON communes. Les requêtes des nouveaux domaines utilisent des DTO avec identifiants ; les rapports et reçus ont des réponses typées.
+Les huit domaines conservés suivent la même structure : skieurs, pistes, cours, moniteurs, inscriptions, planning, abonnements et paiements. Chaque service possède son interface et une implémentation `@Service`, avec injection par constructeur (`@RequiredArgsConstructor`, dépendances `final`). Les contrôleurs et les dépendances interservices utilisent les interfaces, jamais les classes `…ServicesImpl`.
+
+Les transactions et règles métier restent dans les implémentations, avec lectures `readOnly` et verrous conservés pour les écritures sensibles. `TimeRanges` centralise les comparaisons de créneaux, sans dépendance entre implémentations. Les disponibilités appartiennent au planning ; les remboursements et reçus appartiennent aux paiements et ne nécessitent pas des services CRUD artificiels séparés.
+
+`ApiExceptionHandler` fournit les erreurs JSON communes. Les requêtes planning/paiement utilisent des DTO avec identifiants ; `PaymentReceipt` conserve le contrat JSON du reçu. Les noms des repositories existants sont conservés : ce sont tous des interfaces Spring Data JPA.
+
+## Fonctionnalités retirées
+
+Les rapports et le matériel/location sont retirés du code backend et de l’interface Angular. Les routes `/reports/**`, `/equipment/**` et `/rentals/**` ne sont plus exposées. Leurs services, repositories, entités et DTO dédiés ne sont plus présents ; les paiements, remboursements et reçus restent disponibles.
+
+**Aucune table ni donnée n’est supprimée.** Sur une base historique, les anciennes tables `equipment` et `rental` peuvent subsister. Leurs clés étrangères peuvent encore empêcher la suppression d’un skieur : l’API renverra alors un conflit `409`. Aucune migration de suppression ni cascade n’est ajoutée. Redémarrer le serveur sur les nouvelles classes après compilation.
 
 Voir [la référence backend](docs/backend.md) pour les routes, hypothèses, transitions et changements de schéma.
 
@@ -47,14 +57,16 @@ Voir [la référence backend](docs/backend.md) pour les routes, hypothèses, tra
 Les tests n'ont pas été exécutés. Pour les lancer explicitement dans votre environnement :
 
 ```powershell
-# Tests métier isolés, sans base
-mvn '-Dtest=BusinessRulesTest' test
+# Tests métier et structure isolés, sans base
+mvn '-Dtest=BusinessRulesTest,ServiceStructureTest' test
 # Suite complète : le test contextLoads existant exige une base et un schéma compatibles
 mvn test
 # Compilation seule, sans compilation ni exécution des tests
 mvn '-Dmaven.test.skip=true' compile
 ```
 
-`BusinessRulesTest` couvre la capacité, un conflit moniteur, la réservation d'un exemplaire encore actif, la facturation incluant un jour bissextile, les transitions financières, le plafond de remboursement, la ventilation temporelle du revenu et les dates d'abonnement. Les transactions/verrous nécessitent encore des tests d'intégration concurrents sur MySQL ; les mocks ne prouvent pas leur comportement réel.
+`BusinessRulesTest` couvre la capacité, un conflit moniteur, les transitions financières, le plafond de remboursement, le reçu, les dates d'abonnement, les créneaux adjacents et l’orchestration via les interfaces. Les tests des fonctionnalités retirées ont été supprimés. Les transactions/verrous nécessitent encore des tests d'intégration concurrents sur MySQL ; les mocks ne prouvent pas leur comportement réel.
 
-Lors de l'implémentation, seule une revue statique a été possible : Maven n'était pas disponible, le cache du wrapper était absent et seul Java 24 était installé. Aucune compilation, exécution Spring, requête HTTP ou connexion MySQL n'a été effectuée.
+`ServiceStructureTest` vérifie que les huit domaines ont un contrat de service, une implémentation et un contrôleur dépendant du contrat, ainsi que des dépendances `final` injectées par constructeur. Ces tests ont été préparés/compilés, pas exécutés.
+
+Vérification du retrait/harmonisation : `mvn -o -DskipTests test-compile` réussit sous JDK 11, sans exécution des tests ni connexion MySQL. `clean` n’était pas disponible hors ligne (plugin non présent en cache) ; la compilation a été effectuée sans cette phase. Aucun test Spring/HTTP ou parcours de bout en bout n’a été exécuté.

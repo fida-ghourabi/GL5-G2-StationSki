@@ -19,7 +19,7 @@ public class OpenAPIConfig {
 
     public Info infoAPI() {
         return new Info().title("\uD83C\uDFBF SKI STATION MANAGEMENT \uD83D\uDEA0")
-                .description("Gestion de station : skieurs, pistes, cours, planning, matériel, paiements locaux et rapports. Dates ISO ; périodes [début, fin[ sauf indication contraire.")
+                .description("Gestion de station : skieurs, pistes, cours, moniteurs, inscriptions, planning, abonnements et paiements locaux. Dates ISO ; périodes [début, fin[ sauf indication contraire.")
                 .version("1.0")
                 .contact(contactAPI());
     }

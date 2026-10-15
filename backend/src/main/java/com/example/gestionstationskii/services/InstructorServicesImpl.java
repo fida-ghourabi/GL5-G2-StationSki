@@ -2,23 +2,23 @@ package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
-import com.example.gestionstationskii.repositories.IInstructorRepository;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
-@org.springframework.transaction.annotation.Transactional
-public class InstructorServicesImpl implements IInstructorServices{
+@Transactional
+public class InstructorServicesImpl implements IInstructorServices {
 
-    private IInstructorRepository instructorRepository;
-    private ICourseRepository courseRepository;
-    private PlanningSlotRepository slotRepository;
-    private InstructorAvailabilityRepository availabilityRepository;
+    private final IInstructorRepository instructorRepository;
+    private final ICourseRepository courseRepository;
+    private final PlanningSlotRepository slotRepository;
+    private final InstructorAvailabilityRepository availabilityRepository;
 
     @Override
     public Instructor addInstructor(Instructor instructor) {
@@ -30,6 +30,7 @@ public class InstructorServicesImpl implements IInstructorServices{
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Instructor> retrieveAllInstructors() {
         return instructorRepository.findAll();
     }
@@ -43,6 +44,7 @@ public class InstructorServicesImpl implements IInstructorServices{
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Instructor retrieveInstructor(Long numInstructor) {
         Checks.id(numInstructor);
         return instructorRepository.findById(numInstructor).orElseThrow(() -> BusinessException.missing("Moniteur"));
@@ -58,6 +60,7 @@ public class InstructorServicesImpl implements IInstructorServices{
         Checks.text(instructor.getFirstName(), "Prénom"); Checks.text(instructor.getLastName(), "Nom");
         Checks.require(instructor.getDateOfHire() != null && !instructor.getDateOfHire().isAfter(java.time.LocalDate.now()), "Date d'embauche présente ou passée requise");
     }
+    @Override
     public Instructor assignCourse(Long id, Long courseId) {
         Checks.id(id); Checks.id(courseId);
         Course course = courseRepository.lockById(courseId).orElseThrow(() -> BusinessException.missing("Cours"));
@@ -66,6 +69,7 @@ public class InstructorServicesImpl implements IInstructorServices{
         instructor.getCourses().add(course);
         return instructorRepository.save(instructor);
     }
+    @Override
     public Instructor unassignCourse(Long id, Long courseId) {
         Checks.id(courseId);
         Course course = courseRepository.lockById(courseId).orElseThrow(() -> BusinessException.missing("Cours"));
@@ -76,13 +80,18 @@ public class InstructorServicesImpl implements IInstructorServices{
         if (!instructor.getCourses().remove(course)) throw BusinessException.conflict("Association inexistante");
         return instructorRepository.save(instructor);
     }
+    @Override
     public void removeInstructor(Long id) {
         Instructor instructor = retrieveInstructor(id);
         if (!instructor.getCourses().isEmpty() || slotRepository.existsByInstructor_NumInstructor(id) || availabilityRepository.existsByInstructor_NumInstructor(id))
             throw BusinessException.conflict("Moniteur associé à des cours, créneaux ou disponibilités : suppression refusée");
         instructorRepository.delete(instructor);
     }
+    @Override
+    @Transactional(readOnly = true)
     public Set<Course> courses(Long id) { return retrieveInstructor(id).getCourses(); }
+    @Override
+    @Transactional(readOnly = true)
     public List<Instructor> search(String name) {
         String query = name.toLowerCase(java.util.Locale.ROOT);
         return instructorRepository.findAll().stream().filter(i -> (i.getFirstName() + " " + i.getLastName()).toLowerCase(java.util.Locale.ROOT).contains(query))

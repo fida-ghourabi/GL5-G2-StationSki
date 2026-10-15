@@ -10,13 +10,16 @@ import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.*;
 
-@Service @RequiredArgsConstructor @Transactional
-public class PaymentServicesImpl {
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class PaymentServicesImpl implements IPaymentServices {
     private final PaymentRepository payments;
     private final RefundRepository refunds;
     private final ISkierRepository skiers;
     private final ISubscriptionRepository subscriptions;
 
+    @Override
     public Payment record(Requests.PaymentInput input) {
         Checks.id(input.getSkierId()); Checks.id(input.getSubscriptionId()); Checks.money(input.getAmount());
         Checks.require(input.getAmount().signum() > 0 && input.getMethod() != null, "Montant strictement positif et moyen de paiement requis");
@@ -34,8 +37,11 @@ public class PaymentServicesImpl {
         p.setTransactionReference(reference); p.setReceiptNumber("SKI-" + UUID.randomUUID().toString());
         return payments.save(p);
     }
+    @Override
+    @Transactional(readOnly = true)
     public Payment get(Long id) { Checks.id(id); return payments.findById(id).orElseThrow(() -> BusinessException.missing("Paiement")); }
     private Payment locked(Long id) { Checks.id(id); return payments.lockById(id).orElseThrow(() -> BusinessException.missing("Paiement")); }
+    @Override
     public Payment changeStatus(Long id, Requests.PaymentState input) {
         Checks.require(input.getStatus() != null, "Statut requis");
         Payment p = locked(id);
@@ -46,6 +52,7 @@ public class PaymentServicesImpl {
         if (input.getStatus() == PaymentStatus.PAID) p.setPaidAt(LocalDateTime.now());
         return p;
     }
+    @Override
     public Refund refund(Long id, Requests.RefundInput input) {
         Checks.money(input.getAmount()); Checks.require(input.getAmount().signum() > 0, "Remboursement strictement positif requis");
         Checks.text(input.getReason(), "Motif");
@@ -58,12 +65,20 @@ public class PaymentServicesImpl {
         p.setRefundedAmount(total); p.setStatus(total.compareTo(p.getAmount()) == 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
         return refunds.save(r);
     }
+    @Override
+    @Transactional(readOnly = true)
     public List<Payment> bySkier(Long id) { Checks.id(id); skiers.findById(id).orElseThrow(() -> BusinessException.missing("Skieur")); return payments.findBySkier_NumSkier(id); }
+    @Override
+    @Transactional(readOnly = true)
     public List<Payment> bySubscription(Long id) { Checks.id(id); subscriptions.findById(id).orElseThrow(() -> BusinessException.missing("Abonnement")); return payments.findBySubscription_NumSub(id); }
+    @Override
+    @Transactional(readOnly = true)
     public List<Refund> refunds(Long id) { get(id); return refunds.findByPayment_Id(id); }
-    public ReportResponses.Receipt receipt(Long id) {
+    @Override
+    @Transactional(readOnly = true)
+    public PaymentReceipt receipt(Long id) {
         Payment p = get(id);
-        return new ReportResponses.Receipt(p.getReceiptNumber(), p.getId(), p.getSkier().getNumSkier(),
+        return new PaymentReceipt(p.getReceiptNumber(), p.getId(), p.getSkier().getNumSkier(),
                 p.getSkier().getFirstName() + " " + p.getSkier().getLastName(), p.getSubscription().getNumSub(),
                 p.getPaymentDate(), p.getPaidAt(), p.getMethod(), p.getStatus(), p.getAmount(), p.getRefundedAmount(),
                 p.getPaidAt() == null ? BigDecimal.ZERO : p.getAmount().subtract(p.getRefundedAmount()), refunds.findByPayment_Id(id));

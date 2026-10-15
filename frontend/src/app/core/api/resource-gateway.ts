@@ -6,9 +6,7 @@ import { Command, Entity, Registration, SubscriptionType } from '../../shared/mo
 import { SkierApi } from '../../features/skiers/skier-api';
 import { SubscriptionApi } from '../../features/subscriptions/subscription-api';
 import { RegistrationApi } from '../../features/registrations/registration-api';
-import { EquipmentApi } from '../../features/equipment/equipment-api';
 import { PaymentApi } from '../../features/payments/payment-api';
-import { RentalApi } from '../../features/rentals/rental-api';
 import { CourseApi } from '../../features/courses/course-api';
 import { dateRange, subscriptionStatus, person, courseName } from '../../shared/utilities/format';
 
@@ -16,11 +14,11 @@ export type Filters = Record<string, string | number>;
 @Injectable({ providedIn: 'root' })
 export class ResourceGateway {
   private api = inject(ApiClient); private skiers = inject(SkierApi); private subscriptions = inject(SubscriptionApi);
-  private registrations = inject(RegistrationApi); private equipment = inject(EquipmentApi); private payments = inject(PaymentApi);
-  private rentals = inject(RentalApi); private courses = inject(CourseApi);
+  private registrations = inject(RegistrationApi); private payments = inject(PaymentApi);
+  private courses = inject(CourseApi);
   async list(def: ResourceDefinition, filters: Filters, page = 0): Promise<{ rows: Entity[]; total: number }> {
     const from = String(filters['from'] ?? ''), to = String(filters['to'] ?? '');
-    const completeHistory = (def.key === 'registrations' || def.key === 'rentals') && !!filters['skierId'];
+    const completeHistory = def.key === 'registrations' && !!filters['skierId'];
     if (filters['week'] && (!Number.isInteger(Number(filters['week'])) || Number(filters['week']) < 1 || Number(filters['week']) > 53)) throw new Error('Le numéro de semaine doit être un entier compris entre 1 et 53.');
     if (!completeHistory && ((from && !to) || (!from && to))) throw new Error('Renseignez les deux dates de la période.');
     if (!completeHistory && from && to && from > to) throw new Error('La date de fin doit être postérieure ou égale à la date de début.');
@@ -35,21 +33,9 @@ export class ResourceGateway {
         rows = result.filter(row => (!filters['type'] || row.typeSub === filters['type']) && (!filters['state'] || subscriptionStatus(row) === filters['state'] || (filters['state'] === 'ACTIVE' && subscriptionStatus(row) === 'EXPIRING')));
         break;
       }
-      case 'equipment': {
-        if (from && to && from === to) throw new Error('La période de disponibilité doit durer au moins un jour.');
-        const result = await firstValueFrom(from && to ? this.equipment.available({ from, to, type: filters['type'] }) : this.equipment.all());
-        rows = result.filter(row => (!filters['type'] || row.type === filters['type']) && (!filters['status'] || row.status === filters['status']) && (!filters['size'] || row.size.toLowerCase().includes(String(filters['size']).toLowerCase())));
-        break;
-      }
       case 'payments': {
         if (filters['skierId'] && filters['subscriptionId']) throw new Error('Choisissez un seul filtre : skieur ou abonnement.');
         rows = filters['skierId'] ? await firstValueFrom(this.payments.bySkier(Number(filters['skierId']))) : filters['subscriptionId'] ? await firstValueFrom(this.payments.bySubscription(Number(filters['subscriptionId']))) : [];
-        break;
-      }
-      case 'rentals': {
-        if (!filters['skierId'] && (!from || !to)) throw new Error('Choisissez une période ou un skieur.');
-        rows = filters['skierId'] ? await firstValueFrom(this.rentals.bySkier(Number(filters['skierId']))) : await firstValueFrom(this.rentals.search({ from, to: dateRange(from, to).to.slice(0, 10) }));
-        rows = rows.filter(row => !filters['status'] || row['status'] === filters['status']);
         break;
       }
       case 'registrations': {
@@ -82,10 +68,6 @@ export class ResourceGateway {
   }
   async save(def: ResourceDefinition, values: Command, row?: Entity): Promise<Entity> {
     if (def.key === 'registrations') return firstValueFrom(this.registrations.register(Number(values['skierId']), Number(values['slotId'])));
-    if (def.key === 'rentals') {
-      const available = await firstValueFrom(this.equipment.available({ from: String(values['startDate']), to: String(values['expectedEndDate']) }));
-      if (!available.some(e => e.id === values['equipmentId'])) throw new Error('Cet exemplaire n’est pas disponible sur la période choisie. Vérifiez l’inventaire ou choisissez un autre matériel.');
-    }
     const body = { ...values };
     if (def.key === 'courses') body['timeSlot'] = row?.['timeSlot'] ?? 0;
     if (row) {

@@ -5,10 +5,10 @@ export const LABELS: Record<string, string> = {
   ANNUAL: 'Annuel', MONTHLY: 'Mensuel', SEMESTRIEL: 'Semestriel',
   INDIVIDUAL: 'Individuel', COLLECTIVE_CHILDREN: 'Collectif enfants', COLLECTIVE_ADULT: 'Collectif adultes',
   SKI: 'Ski', SNOWBOARD: 'Snowboard', GREEN: 'Verte · facile', BLUE: 'Bleue · intermédiaire', RED: 'Rouge · difficile', BLACK: 'Noire · experte',
-  OPEN: 'Ouvert', FULL: 'Complet', CANCELLED: 'Annulé', AVAILABLE: 'Disponible', RENTED: 'Loué', MAINTENANCE: 'En maintenance', OUT_OF_SERVICE: 'Hors service',
-  RESERVED: 'Réservé', ACTIVE: 'Actif', RETURNED: 'Retourné', EXPIRED: 'Expiré', UPCOMING: 'À venir', EXPIRING: 'Échéance proche',
+  OPEN: 'Ouvert', FULL: 'Complet', CANCELLED: 'Annulé',
+  ACTIVE: 'Actif', EXPIRED: 'Expiré', UPCOMING: 'À venir', EXPIRING: 'Échéance proche',
   PENDING: 'En attente', PAID: 'Encaissé', FAILED: 'Échoué', PARTIALLY_REFUNDED: 'Remboursé en partie', REFUNDED: 'Remboursé',
-  CARD: 'Carte', CASH: 'Espèces', BANK_TRANSFER: 'Virement', SKIS: 'Skis', BOOTS: 'Chaussures', POLES: 'Bâtons', HELMET: 'Casque',
+  CARD: 'Carte', CASH: 'Espèces', BANK_TRANSFER: 'Virement',
   MONDAY: 'Lundi', TUESDAY: 'Mardi', WEDNESDAY: 'Mercredi', THURSDAY: 'Jeudi', FRIDAY: 'Vendredi', SATURDAY: 'Samedi', SUNDAY: 'Dimanche',
 };
 export const label = (value: unknown): string => value == null || value === '' ? '—' : LABELS[String(value)] ?? String(value);

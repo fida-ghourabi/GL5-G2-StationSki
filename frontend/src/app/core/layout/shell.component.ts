@@ -12,8 +12,7 @@ import { FormDialogComponent } from '../../shared/components/form-dialog.compone
     @if (mobile() && menuOpen()) {<button class="icon-btn drawer-close" (click)="closeMenu()" aria-label="Fermer la navigation"><app-icon name="close"/></button>}
     <a routerLink="/dashboard" class="brand"><span class="brand-mark"><app-icon name="mountain"/></span><div><strong>{{ station.name }}</strong><span>{{ station.subtitle }}</span></div></a>
     <div class="nav-section-label">Votre station</div><nav aria-label="Navigation principale">@for (item of navigation; track item.path) {
-      <a [routerLink]="'/' + item.path" routerLinkActive="active" [class.active]="item.path === 'equipment' && section() === 'rentals'" ariaCurrentWhenActive="page" (click)="menuOpen.set(false)"><app-icon [name]="item.icon"/><span>{{ item.title }}</span><app-icon class="nav-chevron" name="chevron"/></a>
-      @if (item.path === 'equipment' && (section() === 'equipment' || section() === 'rentals')) {<a routerLink="/rentals" routerLinkActive="active" class="subnav-link" (click)="menuOpen.set(false)">Locations & retours</a>}
+      <a [routerLink]="'/' + item.path" routerLinkActive="active" ariaCurrentWhenActive="page" (click)="menuOpen.set(false)"><app-icon [name]="item.icon"/><span>{{ item.title }}</span><app-icon class="nav-chevron" name="chevron"/></a>
     }</nav>
     <footer class="sidebar-footer"><div class="topo-lines" aria-hidden="true"></div><span class="eyebrow">Un même cap.</span><strong>Une station bien organisée.</strong><p>Outils de gestion de l’équipe</p><div class="local-mode"><span></span>Gestion locale</div></footer>
   </aside>
@@ -28,13 +27,13 @@ export class ShellComponent implements OnDestroy {
   readonly menuOpen = signal(false); readonly mobile = signal(window.innerWidth <= 1024); readonly url = signal(this.router.url);
   readonly section = computed(() => this.url().split('/')[1]?.split('?')[0]);
   readonly isDetail = computed(() => this.url().split('?')[0].split('/').filter(Boolean).length > 1);
-  readonly activeTitle = computed(() => this.section() === 'rentals' ? 'Matériel et locations' : this.navigation.find(item => item.path === this.section())?.title ?? 'Page introuvable');
+  readonly activeTitle = computed(() => this.navigation.find(item => item.path === this.section())?.title ?? 'Page introuvable');
   readonly date = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   readonly navigation = [
     { path: 'dashboard', title: 'Tableau de bord', icon: 'grid' }, { path: 'skiers', title: 'Skieurs', icon: 'people' }, { path: 'pistes', title: 'Pistes', icon: 'piste' },
     { path: 'courses', title: 'Cours', icon: 'book' }, { path: 'instructors', title: 'Moniteurs', icon: 'badge' }, { path: 'registrations', title: 'Inscriptions', icon: 'clipboard' },
-    { path: 'planning', title: 'Planning', icon: 'calendar' }, { path: 'equipment', title: 'Matériel et locations', icon: 'equipment' }, { path: 'subscriptions', title: 'Abonnements', icon: 'ticket' },
-    { path: 'payments', title: 'Paiements', icon: 'wallet' }, { path: 'reports', title: 'Rapports', icon: 'chart' },
+    { path: 'planning', title: 'Planning', icon: 'calendar' }, { path: 'subscriptions', title: 'Abonnements', icon: 'ticket' },
+    { path: 'payments', title: 'Paiements', icon: 'wallet' },
   ];
   private navigationSubscription = this.router.events.pipe(filter(event => event instanceof NavigationEnd)).subscribe(event => { this.url.set(event.urlAfterRedirects); this.menuOpen.set(false); setTimeout(() => document.getElementById('main-content')?.focus({ preventScroll: true })); });
   closeMenu() { const wasOpen = this.menuOpen(); this.menuOpen.set(false); if (wasOpen) setTimeout(() => document.getElementById('menu-toggle')?.focus()); }

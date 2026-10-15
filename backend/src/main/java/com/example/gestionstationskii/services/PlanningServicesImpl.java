@@ -6,18 +6,22 @@ import com.example.gestionstationskii.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service @RequiredArgsConstructor @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
-public class PlanningServicesImpl {
+@Service
+@RequiredArgsConstructor
+@Transactional(isolation = Isolation.READ_COMMITTED)
+public class PlanningServicesImpl implements IPlanningServices {
     private final PlanningSlotRepository slots;
     private final InstructorAvailabilityRepository availabilities;
     private final IInstructorRepository instructors;
     private final ICourseRepository courses;
     private final IRegistrationRepository registrations;
 
+    @Override
     public InstructorAvailability addAvailability(Long instructorId, Requests.Availability input) {
         Checks.id(instructorId);
         Instructor instructor = instructors.lockById(instructorId).orElseThrow(() -> BusinessException.missing("Moniteur"));
@@ -29,14 +33,20 @@ public class PlanningServicesImpl {
         a.setValidFrom(input.getValidFrom()); a.setValidUntil(input.getValidUntil());
         return availabilities.save(a);
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<InstructorAvailability> availability(Long id) {
         Checks.id(id); instructors.findById(id).orElseThrow(() -> BusinessException.missing("Moniteur"));
         return availabilities.findByInstructor_NumInstructor(id);
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public PlanningSlot get(Long id) {
         Checks.id(id); return slots.findById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
     }
+    @Override
     public PlanningSlot create(Requests.Slot input) { return save(new PlanningSlot(), input); }
+    @Override
     public PlanningSlot update(Long id, Requests.Slot input) {
         Checks.id(id);
         PlanningSlot current = slots.lockById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
@@ -62,12 +72,13 @@ public class PlanningServicesImpl {
         if (!covered) throw BusinessException.conflict("Créneau hors des disponibilités du moniteur");
         boolean overlap = slots.findAll().stream().anyMatch(s -> !s.getId().equals(slot.getId()) && s.getStatus() != SlotStatus.CANCELLED
                 && s.getInstructor().getNumInstructor().equals(input.getInstructorId())
-                && overlaps(s.getStartTime(), s.getEndTime(), input.getStartTime(), input.getEndTime()));
+                && TimeRanges.overlaps(s.getStartTime(), s.getEndTime(), input.getStartTime(), input.getEndTime()));
         if (overlap) throw BusinessException.conflict("Le moniteur a déjà un cours sur ce créneau");
         slot.setCourse(course); slot.setInstructor(instructor); slot.setStartTime(input.getStartTime()); slot.setEndTime(input.getEndTime());
         slot.setMaxCapacity(input.getMaxCapacity()); slot.setStatus(SlotStatus.OPEN);
         return slots.save(slot);
     }
+    @Override
     public void cancel(Long id) {
         Checks.id(id);
         PlanningSlot slot = slots.lockById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
@@ -75,17 +86,16 @@ public class PlanningServicesImpl {
         slot.setStatus(SlotStatus.CANCELLED);
         registrations.findByPlanningSlot_Id(id).forEach(r -> r.setCancelled(true));
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<PlanningSlot> search(LocalDateTime from, LocalDateTime to, Long courseId, Long instructorId, boolean available) {
         Checks.require(from != null && to != null && from.isBefore(to), "Période de recherche invalide");
         if (courseId != null) { Checks.id(courseId); courses.findById(courseId).orElseThrow(() -> BusinessException.missing("Cours")); }
         if (instructorId != null) { Checks.id(instructorId); instructors.findById(instructorId).orElseThrow(() -> BusinessException.missing("Moniteur")); }
-        return slots.findAll().stream().filter(s -> overlaps(s.getStartTime(), s.getEndTime(), from, to)
+        return slots.findAll().stream().filter(s -> TimeRanges.overlaps(s.getStartTime(), s.getEndTime(), from, to)
                 && (courseId == null || s.getCourse().getNumCourse().equals(courseId))
                 && (instructorId == null || s.getInstructor().getNumInstructor().equals(instructorId))
                 && (!available || (s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(LocalDateTime.now()))))
                 .sorted(java.util.Comparator.comparing(PlanningSlot::getStartTime)).collect(Collectors.toList());
-    }
-    public static boolean overlaps(LocalDateTime a, LocalDateTime b, LocalDateTime c, LocalDateTime d) {
-        return a.isBefore(d) && c.isBefore(b);
     }
 }

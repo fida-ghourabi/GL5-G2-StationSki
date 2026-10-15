@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { Command } from '../models/domain';
 export interface Option { value: string | number; label: string }
-export type LookupSource = 'skiers' | 'courses' | 'instructors' | 'pistes' | 'subscriptions' | 'equipment' | 'slots';
+export type LookupSource = 'skiers' | 'courses' | 'instructors' | 'pistes' | 'subscriptions' | 'slots';
 export interface Field {
   key: string; label: string; type?: 'text' | 'number' | 'date' | 'datetime-local' | 'time' | 'select' | 'textarea';
   required?: boolean; min?: number | string; max?: number | string; step?: number; options?: Option[]; source?: LookupSource;

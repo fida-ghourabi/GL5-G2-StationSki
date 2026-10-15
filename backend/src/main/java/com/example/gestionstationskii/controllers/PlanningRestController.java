@@ -2,7 +2,7 @@ package com.example.gestionstationskii.controllers;
 
 import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.entities.*;
-import com.example.gestionstationskii.services.PlanningServicesImpl;
+import com.example.gestionstationskii.services.IPlanningServices;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController @RequestMapping("/planning") @RequiredArgsConstructor
 public class PlanningRestController {
-    private final PlanningServicesImpl service;
+    private final IPlanningServices service;
     @Operation(summary = "Ajouter une disponibilité récurrente (dates de validité incluses)")
     @PostMapping("/availability/{instructorId}")
     public InstructorAvailability add(@PathVariable Long instructorId, @RequestBody Requests.Availability input) { return service.addAvailability(instructorId, input); }

@@ -11,6 +11,5 @@ export const routes: Routes = [
     { path: `${resource.key}/:id`, title: `Dossier ${resource.singular} · Boréal`, data: { resource }, loadComponent: detail },
   ]),
   { path: 'planning', title: 'Planning · Boréal', loadComponent: () => import('./features/planning/planning.component').then(m => m.PlanningComponent) },
-  { path: 'reports', title: 'Rapports · Boréal', loadComponent: () => import('./features/reports/reports.component').then(m => m.ReportsComponent) },
   { path: '**', title: 'Page introuvable · Boréal', loadComponent: () => import('./shared/components/not-found.component').then(m => m.NotFoundComponent) },
 ];

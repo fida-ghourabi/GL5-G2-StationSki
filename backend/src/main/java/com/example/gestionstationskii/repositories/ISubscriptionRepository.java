@@ -2,7 +2,6 @@ package com.example.gestionstationskii.repositories;
 
 import com.example.gestionstationskii.entities.*;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -26,8 +25,6 @@ public interface ISubscriptionRepository extends org.springframework.data.jpa.re
     List<Subscription> findDistinctOrderByEndDateAsc();
 
 
-    @Query("select coalesce(sum(s.price), 0) from Subscription s where s.typeSub = ?1 and s.startDate <= CURRENT_DATE and s.endDate > CURRENT_DATE")
-    Float recurringRevenueByTypeSubEquals(TypeSubscription typeSub);
 
 
 }

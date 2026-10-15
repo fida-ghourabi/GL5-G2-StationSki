@@ -1,7 +1,6 @@
 package com.example.gestionstationskii.services;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import org.springframework.http.HttpStatus;
 
 public final class Checks {
@@ -19,8 +18,5 @@ public final class Checks {
     }
     public static void price(Float price) {
         require(price != null && !price.isNaN() && !price.isInfinite() && price >= 0, "Prix positif ou nul requis");
-    }
-    public static void period(LocalDate from, LocalDate to) {
-        require(from != null && to != null && from.isBefore(to), "La fin doit être postérieure au début");
     }
 }

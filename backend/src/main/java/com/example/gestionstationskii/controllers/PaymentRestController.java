@@ -1,14 +1,14 @@
 package com.example.gestionstationskii.controllers;
 import com.example.gestionstationskii.dto.*;
 import com.example.gestionstationskii.entities.*;
-import com.example.gestionstationskii.services.PaymentServicesImpl;
+import com.example.gestionstationskii.services.IPaymentServices;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 @RestController @RequestMapping("/payments") @RequiredArgsConstructor
 public class PaymentRestController {
-    private final PaymentServicesImpl service;
+    private final IPaymentServices service;
     @Operation(summary = "Enregistrer un paiement local au statut PENDING") @PostMapping
     public Payment record(@RequestBody Requests.PaymentInput input) { return service.record(input); }
     @Operation(summary = "Consulter un paiement") @GetMapping("/{id}")
@@ -24,5 +24,5 @@ public class PaymentRestController {
     @Operation(summary = "Historique des remboursements d'un paiement") @GetMapping("/{id}/refunds")
     public List<Refund> refunds(@PathVariable Long id) { return service.refunds(id); }
     @Operation(summary = "Données du reçu local, avec statut et remboursements") @GetMapping("/{id}/receipt")
-    public ReportResponses.Receipt receipt(@PathVariable Long id) { return service.receipt(id); }
+    public PaymentReceipt receipt(@PathVariable Long id) { return service.receipt(id); }
 }

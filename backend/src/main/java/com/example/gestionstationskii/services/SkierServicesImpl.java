@@ -1,35 +1,36 @@
 package com.example.gestionstationskii.services;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
-@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+@Transactional(isolation = Isolation.READ_COMMITTED)
 public class SkierServicesImpl implements ISkierServices {
 
-    private ISkierRepository skierRepository;
+    private final ISkierRepository skierRepository;
 
-    private IPisteRepository pisteRepository;
+    private final IPisteRepository pisteRepository;
 
-    private ICourseRepository courseRepository;
+    private final ICourseRepository courseRepository;
 
-    private IRegistrationRepository registrationRepository;
+    private final IRegistrationRepository registrationRepository;
 
-    private ISubscriptionRepository subscriptionRepository;
-    private SubscriptionServicesImpl subscriptionServices;
-    private RegistrationServicesImpl registrationServices;
-    private RentalRepository rentalRepository;
-    private PaymentRepository paymentRepository;
+    private final ISubscriptionRepository subscriptionRepository;
+    private final ISubscriptionServices subscriptionServices;
+    private final IRegistrationServices registrationServices;
+    private final PaymentRepository paymentRepository;
 
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Skier> retrieveAllSkiers() {
         return skierRepository.findAll();
     }
@@ -76,13 +77,14 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public void removeSkier(Long numSkier) {
         Skier skier = retrieveSkier(numSkier);
-        if (registrationRepository.existsBySkier_NumSkier(numSkier) || rentalRepository.existsBySkier_NumSkier(numSkier)
+        if (registrationRepository.existsBySkier_NumSkier(numSkier)
                 || paymentRepository.existsBySkier_NumSkier(numSkier))
-            throw BusinessException.conflict("Skieur ayant un historique d'inscription, location ou paiement : suppression refusée");
+            throw BusinessException.conflict("Skieur ayant un historique d'inscription ou de paiement : suppression refusée");
         skierRepository.delete(skier);
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Skier retrieveSkier(Long numSkier) {
         Checks.id(numSkier);
         return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
@@ -100,6 +102,7 @@ public class SkierServicesImpl implements ISkierServices {
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Skier> retrieveSkiersBySubscriptionType(TypeSubscription typeSubscription) {
         Checks.require(typeSubscription != null, "Type d'abonnement requis");
         return skierRepository.findBySubscription_TypeSub(typeSubscription);
@@ -109,6 +112,7 @@ public class SkierServicesImpl implements ISkierServices {
         Checks.text(skier.getFirstName(), "Prénom"); Checks.text(skier.getLastName(), "Nom"); Checks.text(skier.getCity(), "Ville");
         Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(java.time.LocalDate.now()), "Date de naissance passée requise");
     }
+    @Override
     public Skier updateSkier(Skier input) {
         validate(input);
         Checks.id(input.getNumSkier());
@@ -117,6 +121,8 @@ public class SkierServicesImpl implements ISkierServices {
         current.setCity(input.getCity()); current.setDateOfBirth(input.getDateOfBirth());
         return skierRepository.save(current);
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public org.springframework.data.domain.Page<Skier> search(String name, String city, int page, int size) {
         Checks.require(page >= 0 && size > 0 && size <= 100, "Pagination invalide (taille 1 à 100)");
         return skierRepository.search(name, city, org.springframework.data.domain.PageRequest.of(page, size));

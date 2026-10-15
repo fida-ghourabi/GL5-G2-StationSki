@@ -1,8 +1,9 @@
 package com.example.gestionstationskii.services;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 
@@ -11,14 +12,15 @@ import java.util.List;
 import java.util.Set;
 
 @Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
-@org.springframework.transaction.annotation.Transactional
-public class SubscriptionServicesImpl implements ISubscriptionServices{
+@Transactional
+public class SubscriptionServicesImpl implements ISubscriptionServices {
 
-    private ISubscriptionRepository subscriptionRepository;
+    private final ISubscriptionRepository subscriptionRepository;
 
-    private ISkierRepository skierRepository;
+    private final ISkierRepository skierRepository;
+    private final PaymentRepository paymentRepository;
 
     @Override
     public Subscription addSubscription(Subscription subscription) {
@@ -58,24 +60,28 @@ public class SubscriptionServicesImpl implements ISubscriptionServices{
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Subscription retrieveSubscriptionById(Long numSubscription) {
         Checks.id(numSubscription);
         return subscriptionRepository.findById(numSubscription).orElseThrow(() -> BusinessException.missing("Abonnement"));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Set<Subscription> getSubscriptionByType(TypeSubscription type) {
         Checks.require(type != null, "Type d'abonnement requis");
         return subscriptionRepository.findByTypeSubOrderByStartDateAsc(type);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Subscription> retrieveSubscriptionsByDates(LocalDate startDate, LocalDate endDate) {
         Checks.require(startDate != null && endDate != null && !startDate.isAfter(endDate), "Période invalide");
         return subscriptionRepository.getSubscriptionsByStartDateBetween(startDate, endDate);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public void retrieveSubscriptions() {
         for (Subscription sub: subscriptionRepository.findDistinctOrderByEndDateAsc()) {
             Skier   aSkier = skierRepository.findBySubscription(sub);
@@ -85,16 +91,7 @@ public class SubscriptionServicesImpl implements ISubscriptionServices{
         }
     }
 
-    /** Theoretical recurring revenue, not cash collected. Deliberately not scheduled. */
-    public void showMonthlyRecurringRevenue() {
-        Float revenue = subscriptionRepository.recurringRevenueByTypeSubEquals(TypeSubscription.MONTHLY)
-                + subscriptionRepository.recurringRevenueByTypeSubEquals(TypeSubscription.SEMESTRIEL)/6
-                + subscriptionRepository.recurringRevenueByTypeSubEquals(TypeSubscription.ANNUAL)/12;
-        log.info("Monthly Revenue = " + revenue);
-    }
-
-    private PaymentRepository paymentRepository;
-
+    @Override
     public void removeSubscription(Long id) {
         Checks.id(id);
         Subscription sub = subscriptionRepository.lockById(id).orElseThrow(() -> BusinessException.missing("Abonnement"));
@@ -103,6 +100,8 @@ public class SubscriptionServicesImpl implements ISubscriptionServices{
         subscriptionRepository.delete(sub);
     }
 
+    @Override
+    @Transactional(readOnly = true)
     public String status(Long id, LocalDate asOf) {
         Subscription sub = retrieveSubscriptionById(id);
         Checks.require(asOf != null, "Date de référence requise");

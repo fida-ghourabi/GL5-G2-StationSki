@@ -25,12 +25,11 @@ const REFUND_COLUMNS: Column[] = [{ key: 'refundDate', label: 'Date', format: 'd
   <app-state [loading]="loading()" [error]="error()" (retry)="load()"/>
   @if (row(); as current) {
     <section class="detail-banner"><div class="profile-mark"><app-icon [name]="def.icon"/></div><div><p class="eyebrow">{{ def.title }} / Fiche n° {{ id }}</p><h1>{{ title(current) }}</h1><p>{{ subtitle(current) }}</p></div>
-      <div class="actions">@if (def.updatePath && !(def.key === 'equipment' && current['status'] === 'RENTED')) {<button class="btn secondary" (click)="edit()"><app-icon name="edit"/>Modifier</button>}@if (def.deletePath) {<button class="icon-btn danger-text" (click)="remove()" aria-label="Supprimer cette fiche"><app-icon name="trash"/></button>}</div>
+      <div class="actions">@if (def.updatePath) {<button class="btn secondary" (click)="edit()"><app-icon name="edit"/>Modifier</button>}@if (def.deletePath) {<button class="icon-btn danger-text" (click)="remove()" aria-label="Supprimer cette fiche"><app-icon name="trash"/></button>}</div>
     </section>
     <div class="detail-layout"><div class="detail-main">
       <section class="panel"><div class="panel-heading"><h2>Informations {{ def.key === 'payments' ? 'de paiement' : 'du dossier' }}</h2>@if (current['status']) {<app-status [value]="current['status']"/>}@if (def.key === 'subscriptions') {<app-status [value]="subStatus(current)"/>}</div>
         <dl class="detail-facts">@for (col of def.columns; track col.key) {<div><dt>{{ col.label }}</dt><dd>{{ display(current, col) }}</dd></div>}
-          @if (def.key === 'rentals') {<div><dt>Retour réel</dt><dd>{{ date(current['actualReturnDate']) }}</dd></div>}
           @if (def.key === 'payments') {<div><dt>Montant remboursé</dt><dd>{{ money(current['refundedAmount']) }}</dd></div><div><dt>Encaissement confirmé</dt><dd>{{ date(current['paidAt'], true) }}</dd></div>}
         </dl>
       </section>
@@ -51,17 +50,12 @@ const REFUND_COLUMNS: Column[] = [{ key: 'refundDate', label: 'Date', format: 'd
         @case ('instructors') {<button class="btn secondary" (click)="assignCourse()"><app-icon name="plus"/>Associer un cours</button><button class="btn secondary" (click)="unassignCourse()">Retirer un cours</button><button class="btn secondary" (click)="availability()"><app-icon name="calendar"/>Ajouter une disponibilité</button><a class="btn secondary" routerLink="/planning" [queryParams]="{instructorId:id}">Voir le planning</a>}
         @case ('courses') {<a class="btn secondary" routerLink="/planning" [queryParams]="{courseId:id}"><app-icon name="calendar"/>Voir les créneaux</a><a class="btn secondary" routerLink="/instructors">Gérer le moniteur associé</a>}
         @case ('registrations') {@if (!current['cancelled']) {<button class="btn secondary danger-text" (click)="confirm('Annuler l’inscription', '/registration/' + id, 'DELETE')">Annuler l’inscription</button>}}
-        @case ('rentals') {
-          @if (current['status'] === 'RESERVED') {<button class="btn" (click)="confirm('Activer la location', '/rentals/' + id + '/activate', 'PUT', false)">Remettre le matériel</button><button class="btn secondary danger-text" (click)="confirm('Annuler la réservation', '/rentals/' + id + '/cancel', 'PUT')">Annuler la réservation</button>}
-          @if (current['status'] === 'ACTIVE') {<button class="btn" (click)="returnRental()">Enregistrer le retour</button>}
-        }
         @case ('payments') {
           @if (current['status'] === 'PENDING') {<button class="btn" (click)="paymentState('PAID')">Confirmer l’encaissement</button><button class="btn secondary danger-text" (click)="paymentState('FAILED')">Déclarer un échec</button>}
           @if (current['status'] === 'PAID' || current['status'] === 'PARTIALLY_REFUNDED') {<button class="btn secondary" (click)="refund()">Enregistrer un remboursement</button>}
           <button class="btn secondary" (click)="loadReceipt()"><app-icon name="ticket"/>Consulter le reçu</button>
         }
         @case ('subscriptions') {<a class="btn secondary" routerLink="/payments" [queryParams]="{subscriptionId:id}">Consulter les paiements</a>}
-        @case ('equipment') {<a class="btn secondary" routerLink="/rentals">Réserver cet exemplaire</a>}
         @default {<p class="muted">Les affectations aux pistes se font depuis le dossier du skieur.</p>}
       }
       <hr><p class="muted small-copy">{{ def.note || 'Les opérations sont contrôlées par le serveur. Les historiques et les associations peuvent empêcher une suppression.' }}</p>
@@ -77,8 +71,8 @@ export class ResourceDetailComponent implements OnInit {
   readonly participants = signal<number | null>(null); readonly participantsLoading = signal(false); readonly participantsError = signal('');
   readonly money = money; readonly date = day; readonly subStatus = subscriptionStatus;
   ngOnInit() { this.load(); }
-  title(row: Entity) { return ['skiers', 'instructors'].includes(this.def.key) ? person(row) : this.def.key === 'pistes' ? String(row['namePiste']) : this.def.key === 'courses' ? courseName(row) : this.def.key === 'equipment' ? String(row['inventoryCode']) : `${this.def.singular.charAt(0).toUpperCase() + this.def.singular.slice(1)} #${this.id}`; }
-  subtitle(row: Entity) { return this.def.key === 'skiers' ? String(row['city']) : this.def.key === 'equipment' ? `${label(row['type'])} · ${row['brand']} · ${row['size']}` : 'Dossier de la station · informations et historique'; }
+  title(row: Entity) { return ['skiers', 'instructors'].includes(this.def.key) ? person(row) : this.def.key === 'pistes' ? String(row['namePiste']) : this.def.key === 'courses' ? courseName(row) : `${this.def.singular.charAt(0).toUpperCase() + this.def.singular.slice(1)} #${this.id}`; }
+  subtitle(row: Entity) { return this.def.key === 'skiers' ? String(row['city']) : 'Dossier de la station · informations et historique'; }
   display(row: Entity, col: Column) {
     const value = read(row, col.key);
     switch (col.format) {
@@ -109,7 +103,7 @@ export class ResourceDetailComponent implements OnInit {
       case 'skiers':
         if (this.row()?.['subscription']) this.section('Abonnement affecté', Promise.resolve([this.row()!['subscription'] as Entity]), RESOURCES.subscriptions.columns, 'subscriptions');
         this.section('Inscriptions', firstValueFrom(this.api.get<Registration[]>(`/registration/skier/${id}`)).then(rows => this.gateway.enrichRegistrations(rows)), RESOURCES.registrations.columns, 'registrations');
-        section('Locations', `/rentals/skier/${id}`, 'rentals'); section('Paiements', `/payments/skier/${id}`, 'payments'); break;
+        section('Paiements', `/payments/skier/${id}`, 'payments'); break;
       case 'pistes': section('Skieurs affectés', `/piste/${id}/skiers`, 'skiers'); break;
       case 'courses':
         this.loadParticipants();
@@ -141,7 +135,6 @@ export class ResourceDetailComponent implements OnInit {
     this.dialogs.show({ title: 'Retirer un cours', description: 'Confirmez le cours à retirer. Annulez d’abord ses créneaux futurs.', danger: true, submitLabel: 'Confirmer le retrait', fields: [{ key: 'courseId', label: 'Cours associé', type: 'select', options: courses.map(c => ({ value: Number(c['numCourse']), label: courseName(c) })) }], submit: async values => { await firstValueFrom(this.api.delete(`/instructor/${this.id}/courses/${values['courseId']}`)); await this.load(); } });
   }
   availability() { this.dialogs.show({ title: 'Ajouter une disponibilité', fields: availabilityFields(), validate: availabilityValidation, submit: async values => { await firstValueFrom(this.api.post(`/planning/availability/${this.id}`, values)); await this.load(); } }); }
-  returnRental() { this.dialogs.show({ title: 'Enregistrer le retour', description: 'Confirmez la restitution physique. Le serveur recalculera le montant selon la durée réelle.', submitLabel: 'Confirmer le retour', fields: [{ ...dateField('actualReturnDate', 'Date réelle du retour', today()), min: String(this.row()!['startDate']), max: today() }], submit: async values => { await firstValueFrom(this.api.put(`/rentals/${this.id}/return`, values)); await this.load(); } }); }
   paymentState(state: 'PAID' | 'FAILED') { this.confirm(state === 'PAID' ? 'Confirmer l’encaissement' : 'Déclarer le paiement échoué', `/payments/${this.id}/status`, 'PUT', state === 'FAILED', { status: state }); }
   refund() {
     const remaining = Number(this.row()!['amount']) - Number(this.row()!['refundedAmount']);

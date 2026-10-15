@@ -1,24 +1,26 @@
 package com.example.gestionstationskii.services;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import javax.persistence.EntityManager;
 import java.time.Period;
 import java.util.List;
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
-public class RegistrationServicesImpl implements  IRegistrationServices{
+public class RegistrationServicesImpl implements IRegistrationServices {
 
-    private IRegistrationRepository registrationRepository;
-    private ISkierRepository skierRepository;
-    private ICourseRepository courseRepository;
-    private PlanningSlotRepository slotRepository;
-    private IInstructorRepository instructorRepository;
+    private final IRegistrationRepository registrationRepository;
+    private final ISkierRepository skierRepository;
+    private final ICourseRepository courseRepository;
+    private final PlanningSlotRepository slotRepository;
+    private final IInstructorRepository instructorRepository;
+    private final EntityManager entityManager;
 
 
     @Override
@@ -51,12 +53,15 @@ public class RegistrationServicesImpl implements  IRegistrationServices{
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Integer> numWeeksCourseOfInstructorBySupport(Long numInstructor, Support support) {
         Checks.id(numInstructor); Checks.require(support != null, "Support requis");
         instructorRepository.findById(numInstructor).orElseThrow(() -> BusinessException.missing("Moniteur"));
         return registrationRepository.numWeeksCourseOfInstructorBySupport(numInstructor, support);
     }
 
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public PlanningSlot nextAvailableSlot(Long courseId) {
         return slotRepository.findAll().stream().filter(s -> s.getCourse().getNumCourse().equals(courseId)
                 && s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(java.time.LocalDateTime.now()))
@@ -64,6 +69,7 @@ public class RegistrationServicesImpl implements  IRegistrationServices{
                 .orElseThrow(() -> BusinessException.conflict("Aucun créneau disponible pour ce cours"));
     }
 
+    @Override
     public Registration registerSlot(Long skierId, Long slotId) {
         Checks.id(skierId); Checks.id(slotId);
         // Serialize per skier (schedule conflicts), then per slot (capacity).
@@ -82,7 +88,7 @@ public class RegistrationServicesImpl implements  IRegistrationServices{
             if (r.isCancelled()) continue;
             PlanningSlot other = r.getPlanningSlot();
             if (other != null && other.getStatus() != SlotStatus.CANCELLED
-                    && PlanningServicesImpl.overlaps(other.getStartTime(), other.getEndTime(), slot.getStartTime(), slot.getEndTime()))
+                    && TimeRanges.overlaps(other.getStartTime(), other.getEndTime(), slot.getStartTime(), slot.getEndTime()))
                 throw BusinessException.conflict("Inscription en double ou conflit horaire du skieur");
             if (other != null && other.getStatus() != SlotStatus.CANCELLED && r.getCourse().getNumCourse().equals(course.getNumCourse())
                     && other.getStartTime().get(java.time.temporal.IsoFields.WEEK_BASED_YEAR) == slot.getStartTime().get(java.time.temporal.IsoFields.WEEK_BASED_YEAR)
@@ -100,6 +106,7 @@ public class RegistrationServicesImpl implements  IRegistrationServices{
         if (count + 1 >= slot.getMaxCapacity()) slot.setStatus(SlotStatus.FULL);
         return registrationRepository.save(r);
     }
+    @Override
     public void cancel(Long id) {
         Checks.id(id);
         Registration initial = registrationRepository.findById(id).orElseThrow(() -> BusinessException.missing("Inscription"));
@@ -112,18 +119,21 @@ public class RegistrationServicesImpl implements  IRegistrationServices{
         initial.setCancelled(true);
         if (slot != null && slot.getStatus() == SlotStatus.FULL) slot.setStatus(SlotStatus.OPEN);
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Registration> bySkier(Long id) {
         Checks.id(id); skierRepository.findById(id).orElseThrow(() -> BusinessException.missing("Skieur"));
         return registrationRepository.findBySkier_NumSkier(id);
     }
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Registration> search(java.time.LocalDateTime from, java.time.LocalDateTime to, Long courseId) {
         Checks.require(from != null && to != null && from.isBefore(to), "Période invalide");
         if (courseId != null) { Checks.id(courseId); courseRepository.findById(courseId).orElseThrow(() -> BusinessException.missing("Cours")); }
         return registrationRepository.findAll().stream().filter(r -> r.getPlanningSlot() != null
                 && (courseId == null || r.getCourse().getNumCourse().equals(courseId))
-                && PlanningServicesImpl.overlaps(r.getPlanningSlot().getStartTime(), r.getPlanningSlot().getEndTime(), from, to))
+                && TimeRanges.overlaps(r.getPlanningSlot().getStartTime(), r.getPlanningSlot().getEndTime(), from, to))
                 .collect(java.util.stream.Collectors.toList());
     }
-    private javax.persistence.EntityManager entityManager;
 
 }

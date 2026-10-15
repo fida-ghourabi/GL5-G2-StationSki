@@ -26,26 +26,6 @@ public final class Requests {
         private Integer maxCapacity;
     }
     @Getter @Setter
-    public static class EquipmentInput {
-        private String inventoryCode;
-        private EquipmentType type;
-        private String brand;
-        private String size;
-        private BigDecimal dailyRate;
-        private EquipmentStatus status;
-    }
-    @Getter @Setter
-    public static class RentalInput {
-        private Long skierId;
-        private Long equipmentId;
-        private LocalDate startDate;
-        private LocalDate expectedEndDate;
-    }
-    @Getter @Setter
-    public static class RentalReturn {
-        private LocalDate actualReturnDate;
-    }
-    @Getter @Setter
     public static class PaymentInput {
         private Long skierId;
         private Long subscriptionId;

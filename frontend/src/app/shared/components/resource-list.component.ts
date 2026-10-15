@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ResourceGateway, Filters } from '../../core/api/resource-gateway';
@@ -12,9 +12,8 @@ import { IconComponent } from './icon.component';
 import { StateComponent } from './state.component';
 import { DataTableComponent } from './data-table.component';
 
-@Component({ selector: 'app-resource-list', standalone: true, imports: [FormsModule, RouterLink, IconComponent, StateComponent, DataTableComponent], template: `
-  <section class="page-intro"><div><p class="eyebrow">{{ def.key === 'equipment' || def.key === 'rentals' ? 'Parc & équipement' : 'Gestion de la station' }}</p><h1>{{ def.title }}</h1><p>{{ def.description }}</p></div><button class="btn" (click)="create()"><app-icon name="plus"/>{{ createLabel }}</button></section>
-  @if (def.key === 'equipment' || def.key === 'rentals') {<nav class="tabs" aria-label="Matériel et locations"><a routerLink="/equipment" [class.active]="def.key === 'equipment'">Inventaire du parc</a><a routerLink="/rentals" [class.active]="def.key === 'rentals'">Locations & retours</a></nav>}
+@Component({ selector: 'app-resource-list', standalone: true, imports: [FormsModule, IconComponent, StateComponent, DataTableComponent], template: `
+  <section class="page-intro"><div><p class="eyebrow">Gestion de la station</p><h1>{{ def.title }}</h1><p>{{ def.description }}</p></div><button class="btn" (click)="create()"><app-icon name="plus"/>{{ createLabel }}</button></section>
   <section class="panel">
     <form class="filter-bar" (ngSubmit)="search()">
       @for (field of def.filters; track field.key) {
@@ -27,8 +26,8 @@ import { DataTableComponent } from './data-table.component';
     </form>
     @if (lookupError()) {<p class="notice error" role="alert">{{ lookupError() }} <button class="text-button" (click)="loadChoices()">Recharger les choix</button></p>}
     @if (def.note) {<p class="context-note"><app-icon name="alert"/>{{ def.note }}</p>}
-    @if (filters['skierId'] && (def.key === 'registrations' || def.key === 'rentals')) {<p class="notice">Historique complet du skieur sélectionné : les dates de période ne sont pas appliquées.</p>}
-    <div class="panel-heading"><div><h2>{{ def.key === 'payments' ? 'Historique des paiements' : def.key === 'equipment' ? 'Exemplaires du parc' : 'Répertoire' }}</h2><span class="muted">{{ loading() ? 'Actualisation…' : error() ? 'Données indisponibles' : total() + ' résultat' + (total() > 1 ? 's' : '') }}</span></div><button class="icon-btn" aria-label="Actualiser la liste" (click)="load()" [disabled]="loading()"><app-icon name="refresh"/></button></div>
+    @if (filters['skierId'] && def.key === 'registrations') {<p class="notice">Historique complet du skieur sélectionné : les dates de période ne sont pas appliquées.</p>}
+    <div class="panel-heading"><div><h2>{{ def.key === 'payments' ? 'Historique des paiements' : 'Répertoire' }}</h2><span class="muted">{{ loading() ? 'Actualisation…' : error() ? 'Données indisponibles' : total() + ' résultat' + (total() > 1 ? 's' : '') }}</span></div><button class="icon-btn" aria-label="Actualiser la liste" (click)="load()" [disabled]="loading()"><app-icon name="refresh"/></button></div>
     <app-state [loading]="loading()" [error]="error()" [empty]="!rows().length" [icon]="def.icon" [title]="def.key === 'payments' && !filters['skierId'] && !filters['subscriptionId'] ? 'Quel historique souhaitez-vous consulter ?' : 'Aucun résultat pour cette sélection'" [description]="def.key === 'payments' ? 'Sélectionnez un skieur ou un abonnement, ou enregistrez un premier paiement.' : 'Ajustez les filtres ou utilisez le bouton de création pour ajouter un élément.'" (retry)="load()"/>
     @if (!loading() && !error() && rows().length) {<app-data-table [rows]="rows()" [columns]="def.columns" [caption]="def.title" (select)="open($event)"/>}
     @if (def.key === 'skiers' && total() > 20) {<footer class="pagination"><span>Page {{ page() + 1 }} sur {{ pageCount }}</span><button class="btn small secondary" [disabled]="page() === 0 || loading()" (click)="changePage(-1)">Précédente</button><button class="btn small secondary" [disabled]="page() + 1 >= pageCount || loading()" (click)="changePage(1)">Suivante</button></footer>}
@@ -39,7 +38,7 @@ export class ResourceListComponent implements OnInit {
   private gateway = inject(ResourceGateway); private lookup = inject(LookupService); private dialogs = inject(FormDialogService); private router = inject(Router);
   readonly rows = signal<Entity[]>([]); readonly total = signal(0); readonly loading = signal(false); readonly error = signal(''); readonly lookupError = signal(''); readonly page = signal(0);
   readonly lookupOptions = signal<Record<string, Option[]>>({}); filters: Filters = {}; private generation = 0;
-  get createLabel() { return this.def.key === 'registrations' ? 'Inscrire un skieur' : this.def.key === 'rentals' ? 'Réserver du matériel' : this.def.key === 'payments' ? 'Enregistrer un paiement' : `Ajouter ${['équipement', 'abonnement'].includes(this.def.singular) ? 'un ' : this.def.singular === 'piste' ? 'une ' : 'un '}${this.def.singular}`; }
+  get createLabel() { return this.def.key === 'registrations' ? 'Inscrire un skieur' : this.def.key === 'payments' ? 'Enregistrer un paiement' : `Ajouter ${this.def.singular === 'piste' ? 'une ' : 'un '}${this.def.singular}`; }
   get pageCount() { return Math.ceil(this.total() / 20); }
   ngOnInit() { this.defaults(); const query = injectQuery(this.router.url); for (const key of ['skierId', 'subscriptionId', 'courseId']) { if (query[key] && this.def.filters.some(field => field.key === key)) this.filters[key] = Number(query[key]); } this.loadChoices(); this.load(); }
   defaults() { this.filters = Object.fromEntries(this.def.filters.map(field => [field.key, field.default as string ?? ''])); }
@@ -60,8 +59,7 @@ export class ResourceListComponent implements OnInit {
   }
   open(row: Entity) { this.router.navigate(['/', this.def.key, row[this.def.idKey]], { queryParams: this.def.key === 'registrations' ? { skierId: row['skierId'] } : {} }); }
   create() {
-    this.dialogs.show({ title: this.createLabel, fields: this.def.fields, description: this.def.key === 'rentals' ? 'La disponibilité sera vérifiée auprès du serveur avant la réservation.' : this.def.note,
-      validate: values => this.def.key === 'rentals' && String(values['expectedEndDate']) <= String(values['startDate']) ? 'Le retour prévu doit être postérieur au début.' : undefined,
+    this.dialogs.show({ title: this.createLabel, fields: this.def.fields, description: this.def.note,
       submit: async values => {
         const created = await this.gateway.save(this.def, values);
         this.open(created);

@@ -1,7 +1,7 @@
 package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.dto.Requests;
-import com.example.gestionstationskii.dto.ReportResponses;
+import com.example.gestionstationskii.dto.PaymentReceipt;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 import org.junit.jupiter.api.Test;
@@ -16,35 +16,11 @@ import static org.mockito.Mockito.*;
 /** Isolated business tests: no Spring context, database or banking provider. */
 class BusinessRulesTest {
     @Test
-    void rentalPriceExcludesReturnDateAndHandlesLeapDay() {
-        EquipmentRentalServicesImpl service = new EquipmentRentalServicesImpl(mock(EquipmentRepository.class),
-                mock(RentalRepository.class), mock(ISkierRepository.class), mock(EntityManager.class));
-        assertEquals(new BigDecimal("25.00"), service.price(new BigDecimal("12.50"), LocalDate.of(2028, 2, 28), LocalDate.of(2028, 3, 1)));
-    }
-
-    @Test
-    void activeRentalBlocksAnotherReservationEvenAfterPlannedEnd() {
-        EquipmentRepository equipment = mock(EquipmentRepository.class);
-        RentalRepository rentals = mock(RentalRepository.class);
-        ISkierRepository skiers = mock(ISkierRepository.class);
-        EquipmentRentalServicesImpl service = new EquipmentRentalServicesImpl(equipment, rentals, skiers, mock(EntityManager.class));
-        Equipment e = new Equipment(); e.setId(1L); e.setStatus(EquipmentStatus.RENTED);
-        Rental active = new Rental(); active.setStatus(RentalStatus.ACTIVE); active.setStartDate(LocalDate.now().minusDays(5)); active.setExpectedEndDate(LocalDate.now().minusDays(2));
-        when(skiers.lockById(1L)).thenReturn(Optional.of(new Skier()));
-        when(equipment.lockById(1L)).thenReturn(Optional.of(e));
-        when(rentals.findByEquipment_Id(1L)).thenReturn(Collections.singletonList(active));
-        Requests.RentalInput input = new Requests.RentalInput(); input.setSkierId(1L); input.setEquipmentId(1L);
-        input.setStartDate(LocalDate.now().plusDays(1)); input.setExpectedEndDate(LocalDate.now().plusDays(3));
-        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class, () -> service.reserve(input)).getStatus());
-        verify(rentals, never()).save(any(Rental.class));
-    }
-
-    @Test
     void registrationRejectsCapacityReachedEvenIfStatusIsStale() {
         IRegistrationRepository registrations = mock(IRegistrationRepository.class);
         ISkierRepository skiers = mock(ISkierRepository.class);
         PlanningSlotRepository slots = mock(PlanningSlotRepository.class);
-        RegistrationServicesImpl service = new RegistrationServicesImpl(registrations, skiers, mock(ICourseRepository.class), slots,
+        IRegistrationServices service = new RegistrationServicesImpl(registrations, skiers, mock(ICourseRepository.class), slots,
                 mock(IInstructorRepository.class), mock(EntityManager.class));
         Skier skier = new Skier(); skier.setNumSkier(1L); skier.setDateOfBirth(LocalDate.of(1990, 1, 1));
         Course course = new Course(); course.setNumCourse(1L); course.setTypeCourse(TypeCourse.COLLECTIVE_ADULT);
@@ -63,7 +39,7 @@ class BusinessRulesTest {
         InstructorAvailabilityRepository availability = mock(InstructorAvailabilityRepository.class);
         IInstructorRepository instructors = mock(IInstructorRepository.class);
         ICourseRepository courses = mock(ICourseRepository.class);
-        PlanningServicesImpl service = new PlanningServicesImpl(slots, availability, instructors, courses, mock(IRegistrationRepository.class));
+        IPlanningServices service = new PlanningServicesImpl(slots, availability, instructors, courses, mock(IRegistrationRepository.class));
         LocalDate day = LocalDate.now().plusDays(2);
         Course course = new Course(); course.setNumCourse(1L); course.setTypeCourse(TypeCourse.COLLECTIVE_ADULT);
         Instructor instructor = new Instructor(); instructor.setNumInstructor(1L); instructor.setCourses(new HashSet<>(Collections.singletonList(course)));
@@ -83,7 +59,7 @@ class BusinessRulesTest {
     @Test
     void paidPaymentCannotBecomeFailed() {
         PaymentRepository payments = mock(PaymentRepository.class);
-        PaymentServicesImpl service = new PaymentServicesImpl(payments, mock(RefundRepository.class), mock(ISkierRepository.class), mock(ISubscriptionRepository.class));
+        IPaymentServices service = new PaymentServicesImpl(payments, mock(RefundRepository.class), mock(ISkierRepository.class), mock(ISubscriptionRepository.class));
         Payment p = new Payment(); p.setStatus(PaymentStatus.PAID);
         when(payments.lockById(1L)).thenReturn(Optional.of(p));
         Requests.PaymentState input = new Requests.PaymentState(); input.setStatus(PaymentStatus.FAILED);
@@ -95,7 +71,7 @@ class BusinessRulesTest {
     void refundCannotExceedRemainingPaidAmount() {
         PaymentRepository payments = mock(PaymentRepository.class);
         RefundRepository refunds = mock(RefundRepository.class);
-        PaymentServicesImpl service = new PaymentServicesImpl(payments, refunds, mock(ISkierRepository.class), mock(ISubscriptionRepository.class));
+        IPaymentServices service = new PaymentServicesImpl(payments, refunds, mock(ISkierRepository.class), mock(ISubscriptionRepository.class));
         Payment p = new Payment(); p.setStatus(PaymentStatus.PARTIALLY_REFUNDED); p.setAmount(new BigDecimal("100.00")); p.setRefundedAmount(new BigDecimal("75.00"));
         when(payments.lockById(1L)).thenReturn(Optional.of(p));
         Requests.RefundInput input = new Requests.RefundInput(); input.setAmount(new BigDecimal("25.01")); input.setReason("Correction");
@@ -104,25 +80,57 @@ class BusinessRulesTest {
     }
 
     @Test
-    void revenuePlacesRefundInItsOwnAccountingPeriod() {
+    void receiptPreservesPaymentContractWithoutReporting() {
         PaymentRepository payments = mock(PaymentRepository.class);
         RefundRepository refunds = mock(RefundRepository.class);
-        ReportServicesImpl service = new ReportServicesImpl(payments, refunds, mock(ISubscriptionRepository.class), mock(ICourseRepository.class), mock(PlanningSlotRepository.class), mock(IRegistrationRepository.class));
-        Payment p = new Payment(); p.setAmount(new BigDecimal("100.00")); p.setStatus(PaymentStatus.REFUNDED); p.setPaidAt(LocalDateTime.of(2026, 1, 15, 10, 0));
-        Refund r = new Refund(); r.setAmount(new BigDecimal("100.00")); r.setRefundDate(LocalDateTime.of(2026, 2, 15, 10, 0));
-        when(payments.findAll()).thenReturn(Collections.singletonList(p)); when(refunds.findAll()).thenReturn(Collections.singletonList(r));
-        ReportResponses.Revenue january = service.revenue(LocalDateTime.of(2026, 1, 1, 0, 0), LocalDateTime.of(2026, 2, 1, 0, 0));
-        ReportResponses.Revenue february = service.revenue(LocalDateTime.of(2026, 2, 1, 0, 0), LocalDateTime.of(2026, 3, 1, 0, 0));
-        assertEquals(0, new BigDecimal("100").compareTo(january.getNet()));
-        assertEquals(0, new BigDecimal("-100").compareTo(february.getNet()));
+        IPaymentServices service = new PaymentServicesImpl(payments, refunds, mock(ISkierRepository.class), mock(ISubscriptionRepository.class));
+        Skier skier = new Skier(); skier.setNumSkier(2L); skier.setFirstName("Amina"); skier.setLastName("Test");
+        Subscription sub = new Subscription(); sub.setNumSub(3L);
+        Payment p = new Payment(); p.setId(1L); p.setSkier(skier); p.setSubscription(sub); p.setReceiptNumber("SKI-TEST");
+        p.setAmount(new BigDecimal("100.00")); p.setRefundedAmount(new BigDecimal("25.00")); p.setStatus(PaymentStatus.PARTIALLY_REFUNDED);
+        p.setPaidAt(LocalDateTime.of(2026, 1, 15, 10, 0));
+        Refund r = new Refund(); r.setAmount(new BigDecimal("25.00"));
+        when(payments.findById(1L)).thenReturn(Optional.of(p)); when(refunds.findByPayment_Id(1L)).thenReturn(Collections.singletonList(r));
+        PaymentReceipt receipt = service.receipt(1L);
+        assertEquals("SKI-TEST", receipt.getReceiptNumber());
+        assertEquals("Amina Test", receipt.getSkierName());
+        assertEquals(new BigDecimal("75.00"), receipt.getNetAmount());
+        assertEquals(Collections.singletonList(r), receipt.getRefunds());
     }
 
     @Test
     void monthlySubscriptionUsesCalendarMonthAtMonthEnd() {
         ISubscriptionRepository subscriptions = mock(ISubscriptionRepository.class);
-        SubscriptionServicesImpl service = new SubscriptionServicesImpl(subscriptions, mock(ISkierRepository.class), mock(PaymentRepository.class));
+        ISubscriptionServices service = new SubscriptionServicesImpl(subscriptions, mock(ISkierRepository.class), mock(PaymentRepository.class));
         Subscription s = new Subscription(); s.setTypeSub(TypeSubscription.MONTHLY); s.setStartDate(LocalDate.of(2028, 1, 31)); s.setPrice(50f);
         when(subscriptions.save(s)).thenReturn(s);
         assertEquals(LocalDate.of(2028, 2, 29), service.addSubscription(s).getEndDate());
+    }
+
+    @Test
+    void adjacentLessonsDoNotOverlap() {
+        LocalDateTime start = LocalDate.of(2027, 1, 1).atTime(9, 0);
+        assertFalse(TimeRanges.overlaps(start, start.plusHours(1), start.plusHours(1), start.plusHours(2)));
+        assertTrue(TimeRanges.overlaps(start, start.plusHours(1), start.plusMinutes(30), start.plusHours(2)));
+    }
+
+    @Test
+    void skierCreationUsesSubscriptionAndRegistrationInterfaces() {
+        ISkierRepository skiers = mock(ISkierRepository.class);
+        ICourseRepository courses = mock(ICourseRepository.class);
+        ISubscriptionServices subscriptions = mock(ISubscriptionServices.class);
+        IRegistrationServices registrations = mock(IRegistrationServices.class);
+        ISkierServices service = new SkierServicesImpl(skiers, mock(IPisteRepository.class), courses,
+                mock(IRegistrationRepository.class), mock(ISubscriptionRepository.class), subscriptions, registrations, mock(PaymentRepository.class));
+        Skier skier = new Skier(); skier.setFirstName("Amina"); skier.setLastName("Test"); skier.setCity("Tunis"); skier.setDateOfBirth(LocalDate.of(2000, 1, 1));
+        Subscription sub = new Subscription(); skier.setSubscription(sub);
+        PlanningSlot slot = new PlanningSlot(); slot.setId(3L);
+        when(courses.findById(2L)).thenReturn(Optional.of(new Course()));
+        when(subscriptions.addSubscription(sub)).thenReturn(sub);
+        when(skiers.save(skier)).thenAnswer(invocation -> { skier.setNumSkier(1L); return skier; });
+        when(registrations.nextAvailableSlot(2L)).thenReturn(slot);
+        assertSame(skier, service.addSkierAndAssignToCourse(skier, 2L));
+        verify(subscriptions).addSubscription(sub);
+        verify(registrations).registerSlot(1L, 3L);
     }
 }

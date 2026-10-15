@@ -7,9 +7,6 @@ pipeline {
     }
 
     environment {
-        GIT_URL            = 'https://github.com/fida-ghourabi/GL5-G2-StationSki.git'
-        GIT_BRANCH_NAME    = 'features/sahar-saidani'
-
         registry           = 'saharsaidani/gestion-station-skii'
         registryCredential = 'dockerhub'
         dockerImage        = ''
@@ -28,8 +25,8 @@ pipeline {
 
         stage('CHECKOUT GIT') {
             steps {
-                deleteDir()
-                git branch: "${GIT_BRANCH_NAME}", url: "${GIT_URL}"
+                // Réutilise le dépôt et la branche configurés dans le job Jenkins
+                checkout scm
             }
         }
 

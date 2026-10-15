@@ -12,9 +12,11 @@ pipeline {
         dockerImage        = ''
 
         SONAR_URL          = 'http://sonarqube:9000'
-        // Version du projet = 0.0.x-SNAPSHOT => dépôt SNAPSHOT de Nexus (pas "releases")
+        // Version du projet 0.0.x-SNAPSHOT => depot SNAPSHOT de Nexus
         NEXUS_SNAPSHOTS    = 'http://nexus:8081/repository/maven-snapshots/'
         BACKEND_DIR        = 'backend'
+        TERRAFORM_DIR      = 'terraform'
+        TF_IN_AUTOMATION   = 'true'
     }
 
     options {
@@ -136,9 +138,26 @@ EOF
             }
         }
 
-        // ---- Étapes à ajouter plus tard ----
-        // stage('TERRAFORM')  { ... }
-        // stage('KUBERNETES') { ... }
+        stage('TERRAFORM VALIDATE') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform version'
+
+                    // Format : ne bloque pas le pipeline (stage jaune si probleme)
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        sh 'terraform fmt -check -recursive -diff'
+                    }
+
+                    // init et validate ne demandent pas de credentials AWS
+                    sh 'terraform init -input=false'
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        // ---- Etapes a ajouter plus tard ----
+        // TERRAFORM PLAN/APPLY
+        // KUBERNETES
     }
 
     post {

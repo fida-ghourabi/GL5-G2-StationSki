@@ -12,8 +12,9 @@ pipeline {
         dockerImage        = ''
 
         SONAR_URL          = 'http://sonarqube:9000'
-        // Version du projet = 0.0.1-SNAPSHOT => dépôt SNAPSHOT de Nexus (pas "releases")
+        // Version du projet = 0.0.x-SNAPSHOT => dépôt SNAPSHOT de Nexus (pas "releases")
         NEXUS_SNAPSHOTS    = 'http://nexus:8081/repository/maven-snapshots/'
+        BACKEND_DIR        = 'backend'
     }
 
     options {
@@ -25,32 +26,37 @@ pipeline {
 
         stage('CHECKOUT GIT') {
             steps {
-                // Réutilise le dépôt et la branche configurés dans le job Jenkins
                 checkout scm
             }
         }
 
         stage('MVN CLEAN') {
             steps {
-                sh 'mvn -B clean'
+                dir("${BACKEND_DIR}") {
+                    sh 'mvn -B clean'
+                }
             }
         }
 
         stage('ARTIFACT CONSTRUCTION') {
             steps {
                 echo 'ARTIFACT CONSTRUCTION...'
-                sh 'mvn -B package -DskipTests'
+                dir("${BACKEND_DIR}") {
+                    sh 'mvn -B package -DskipTests'
+                }
             }
         }
 
         stage('UNIT TESTS') {
             steps {
                 echo 'Launching Unit Tests (JUnit + Mockito + JaCoCo)...'
-                sh 'mvn -B test'
+                dir("${BACKEND_DIR}") {
+                    sh 'mvn -B test'
+                }
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+                    junit allowEmptyResults: true, testResults: 'backend/target/surefire-reports/TEST-*.xml'
                 }
             }
         }
@@ -58,13 +64,15 @@ pipeline {
         stage('MVN SONARQUBE') {
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                        mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
-                          -Dsonar.projectKey=gestion-station-skii \
-                          -Dsonar.host.url=$SONAR_URL \
-                          -Dsonar.token="$SONAR_TOKEN" \
-                          -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
-                    '''
+                    dir("${BACKEND_DIR}") {
+                        sh '''
+                            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
+                              -Dsonar.projectKey=gestion-station-skii \
+                              -Dsonar.host.url=$SONAR_URL \
+                              -Dsonar.token="$SONAR_TOKEN" \
+                              -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                        '''
+                    }
                 }
             }
         }
@@ -87,13 +95,15 @@ pipeline {
     </servers>
 </settings>
 EOF
-
-                        mvn -B deploy -DskipTests \
-                          -s "$WORKSPACE/settings-nexus.xml" \
-                          -DaltDeploymentRepository=nexus-snapshots::default::$NEXUS_SNAPSHOTS
-
-                        rm -f "$WORKSPACE/settings-nexus.xml"
                     '''
+                    dir("${BACKEND_DIR}") {
+                        sh '''
+                            mvn -B deploy -DskipTests \
+                              -s "$WORKSPACE/settings-nexus.xml" \
+                              -DaltDeploymentRepository=nexus-snapshots::default::$NEXUS_SNAPSHOTS
+                        '''
+                    }
+                    sh 'rm -f "$WORKSPACE/settings-nexus.xml"'
                 }
             }
         }
@@ -101,7 +111,16 @@ EOF
         stage('BUILDING OUR IMAGE') {
             steps {
                 script {
-                    dockerImage = docker.build("${registry}:${BUILD_NUMBER}")
+                    // Version lue dans backend/pom.xml (ex. 0.0.2-SNAPSHOT -> 0.0.2)
+                    def pomVersion = sh(
+                        script: "cd ${BACKEND_DIR} && mvn -q -B help:evaluate -Dexpression=project.version -DforceStdout",
+                        returnStdout: true
+                    ).trim()
+                    env.IMAGE_TAG = "${pomVersion.replace('-SNAPSHOT', '')}-${BUILD_NUMBER}"
+                    echo "Image : ${registry}:${env.IMAGE_TAG}"
+
+                    // Le Dockerfile est dans backend/, qui sert de contexte de build
+                    dockerImage = docker.build("${registry}:${env.IMAGE_TAG}", "${BACKEND_DIR}")
                 }
             }
         }
@@ -110,7 +129,7 @@ EOF
             steps {
                 script {
                     docker.withRegistry('', registryCredential) {
-                        dockerImage.push()
+                        dockerImage.push()          // ex. 0.0.2-1
                         dockerImage.push('latest')
                     }
                 }

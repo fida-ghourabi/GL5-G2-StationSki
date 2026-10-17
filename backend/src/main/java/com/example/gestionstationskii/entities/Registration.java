@@ -26,7 +26,8 @@ public class Registration implements Serializable {
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	Long numRegistration;
 	int numWeek;
-	@Column(nullable = false, columnDefinition = "boolean default false")
+	@Column(nullable = false)
+	@org.hibernate.annotations.ColumnDefault("false")
 	boolean cancelled;
 	@ManyToOne
 	private PlanningSlot planningSlot;

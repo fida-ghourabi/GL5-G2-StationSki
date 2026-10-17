@@ -38,4 +38,28 @@ Run all sixteen Piste/Skier CRUD tests without MySQL:
 mvn -Dtest=PisteCrudIntegrationTest,SkierCrudIntegrationTest,PisteCrudMockitoTest,SkierCrudMockitoTest test
 ```
 
-Use Java 17 as shown above. Verified: all eight Mockito tests pass and `mvn clean test` passes all 26 project tests. These happy-path tests do not prove transaction/concurrency behavior or cover every error branch. Next: JaCoCo coverage (Phase 6).
+Use Java 17 as shown above. Verified: all eight Mockito tests pass and `mvn clean test` passes all 26 project tests. These happy-path tests do not prove transaction/concurrency behavior or cover every error branch.
+
+## JaCoCo coverage (Phase 6)
+
+JaCoCo attaches its agent before tests and generates HTML/XML/CSV reports during the Maven `test` phase. No production dependencies or coverage exclusions were added. The report includes the entire backend; inspect your own services in the `com.example.gestionstationskii.services` package.
+
+Load the Java/database environment as above, then:
+
+```bash
+mvn clean test
+xdg-open target/site/jacoco/index.html
+```
+
+The XML report for later SonarQube integration is `target/site/jacoco/jacoco.xml`.
+
+Verified with all 26 tests passing:
+
+| Service | Line coverage | Branch coverage |
+| --- | --- | --- |
+| PisteServicesImpl | 42/44 (95.5%) | 7/18 (38.9%) |
+| SkierServicesImpl | 54/75 (72.0%) | 10/34 (29.4%) |
+
+Coverage measures exercised code, not correctness. Error paths, subscription/course assignments and other non-CRUD behavior remain only partially covered. No minimum coverage gate is configured. A targeted test run regenerates the report for only that run; run the full suite again before taking your final screenshot. Keep a screenshot of the services coverage page as course evidence.
+
+Next: DevOps tool containers (Phase 7), then SonarQube (Phase 8).

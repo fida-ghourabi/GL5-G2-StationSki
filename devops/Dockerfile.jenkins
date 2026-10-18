@@ -1,0 +1,4 @@
+# Controller uses Java 21; Maven builds explicitly select Java 17.
+FROM eclipse-temurin:17-jdk AS build-jdk
+FROM jenkins/jenkins:lts-jdk21@sha256:a660310e39ade10631f774bacd5219de767dfd08947ea5c32a739b5e5bb382c1
+COPY --from=build-jdk /opt/java/openjdk /opt/java17

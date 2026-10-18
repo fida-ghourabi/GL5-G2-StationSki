@@ -1,0 +1,18 @@
+# Terraform state, plans and provider cache
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/tfplan
+**/crash.log
+
+# Local Kubernetes configuration and generated secrets
+.kube/
+*.secret.yaml
+
+# Maven build output
+backend/target/
+
+# Angular build output and dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/

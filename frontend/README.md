@@ -43,6 +43,8 @@ En production, configurer le serveur web pour :
 2. transmettre `/stationSki/` au backend en conservant ce préfixe ;
 3. rediriger les autres routes Angular non physiques vers `index.html`.
 
+Pour la CI/CD AWS, l’image de production du frontend est construite avec `Dockerfile` et `nginx.conf` : Nginx sert les fichiers Angular et transmet `/stationSki/` au service backend interne Kubernetes. Le pipeline et le déploiement EKS sont décrits dans le [guide racine](../DEPLOYMENT.md).
+
 Le proxy de développement n’est pas inclus dans les fichiers de production.
 
 ## Configuration et architecture

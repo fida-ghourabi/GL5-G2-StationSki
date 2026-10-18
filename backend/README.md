@@ -1,8 +1,8 @@
 # Gestion de station de ski
 
-Backend Java 8 / Spring Boot 2.7.5, Spring Web, JPA/Hibernate, MySQL, Lombok et springdoc 1.6.9. Les paiements sont enregistrés localement. Aucune dépendance supplémentaire n'est nécessaire.
+Backend Java 8 / Spring Boot 2.7.5, Spring Web, JPA/Hibernate, MySQL, Lombok, springdoc 1.6.9 et Actuator/Micrometer pour l'état de santé et Prometheus. Les paiements sont enregistrés localement.
 
-Le connecteur MySQL existant est fixé à `8.0.33` (compatible Java 8) pour ne pas dépendre de la gestion de ses coordonnées Maven selon la version du BOM. JUnit Jupiter et Mockito utilisent les versions cohérentes fournies par `spring-boot-starter-test`.
+Le connecteur MySQL existant est fixé à `8.0.33` (compatible Java 8) pour ne pas dépendre de la gestion de ses coordonnées Maven selon la version du BOM. JUnit Jupiter et Mockito utilisent les versions cohérentes fournies par `spring-boot-starter-test`. H2 et le provider Bean Validation sont des dépendances de test uniquement.
 
 ## Lancer en développement
 
@@ -54,19 +54,21 @@ Voir [la référence backend](docs/backend.md) pour les routes, hypothèses, tra
 
 ## Vérifier le projet
 
-Les tests n'ont pas été exécutés. Pour les lancer explicitement dans votre environnement :
+Les tests utilisent JUnit 5, Mockito, Spring MockMvc et H2. Ils n'ont pas besoin d'un serveur MySQL : les tests du repository et le test de démarrage Spring utilisent une base H2 isolée. Depuis `backend/`, les commandes Windows sont :
 
 ```powershell
-# Tests métier et structure isolés, sans base
-mvn '-Dtest=BusinessRulesTest,ServiceStructureTest' test
-# Suite complète : le test contextLoads existant exige une base et un schéma compatibles
-mvn test
-# Compilation seule, sans compilation ni exécution des tests
-mvn '-Dmaven.test.skip=true' compile
+# Tests du service d'inscription, du contrôleur et tests métier existants
+.\mvnw.cmd '-Dtest=RegistrationServicesTest,RegistrationRestControllerTest,BusinessRulesTest,ServiceStructureTest' test
+
+# Test d'intégration JPA/repository sur H2
+.\mvnw.cmd '-Dtest=RegistrationRepositoryTest' test
+
+# Suite complète, construction du JAR et contrôle JaCoCo
+.\mvnw.cmd verify
 ```
 
-`BusinessRulesTest` couvre la capacité, un conflit moniteur, les transitions financières, le plafond de remboursement, le reçu, les dates d'abonnement, les créneaux adjacents et l’orchestration via les interfaces. Les tests des fonctionnalités retirées ont été supprimés. Les transactions/verrous nécessitent encore des tests d'intégration concurrents sur MySQL ; les mocks ne prouvent pas leur comportement réel.
+Sur macOS/Linux, utiliser `./mvnw` avec les mêmes options. Le rapport JaCoCo HTML est généré dans `target/site/jacoco/index.html` et le rapport CSV dans `target/site/jacoco/jacoco.csv`. Le build `verify` impose au service `RegistrationServicesImpl` au minimum 80 % de couverture des lignes et 65 % des branches.
 
-`ServiceStructureTest` vérifie que les huit domaines ont un contrat de service, une implémentation et un contrôleur dépendant du contrat, ainsi que des dépendances `final` injectées par constructeur. Ces tests ont été préparés/compilés, pas exécutés.
+La suite couvre les inscriptions, les règles d'âge et de capacité, les conflits horaires et hebdomadaires, l'annulation, la recherche, les réponses HTTP/JSON, les associations JPA et les requêtes Spring Data. La dernière vérification locale a réussi : 41 tests, aucune erreur ni omission. `RegistrationServicesImpl` atteint 96,1 % des lignes et 78,4 % des branches.
 
-Vérification du retrait/harmonisation : `mvn -o -DskipTests test-compile` réussit sous JDK 11, sans exécution des tests ni connexion MySQL. `clean` n’était pas disponible hors ligne (plugin non présent en cache) ; la compilation a été effectuée sans cette phase. Aucun test Spring/HTTP ou parcours de bout en bout n’a été exécuté.
+Voir le [guide de déploiement AWS/EKS](../DEPLOYMENT.md) pour le pipeline Jenkins, Docker, Terraform, RDS, EKS et la configuration des credentials. Jenkins exécute les tests backend puis compile le frontend dans Docker. Les tests H2 ne valident pas le comportement des verrous/concurrences spécifiques au moteur MySQL ; des tests concurrents sur une instance MySQL restent à prévoir si cette garantie doit être vérifiée en intégration.

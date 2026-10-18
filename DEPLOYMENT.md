@@ -31,7 +31,7 @@ Le pipeline publie par défaut le JAR snapshot à Nexus et les images taguées d
 
 Les étapes AWS sont désactivées par défaut :
 
-1. Pour planifier/créer l’infrastructure, activer `APPLY_TERRAFORM` et renseigner `EKS_API_CIDR` avec l’adresse IPv4 publique de sortie de Jenkins, au format CIDR précis (par exemple `203.0.113.10/32`). Le plan puis l’application créent un réseau à deux zones, un NAT Gateway, un cluster EKS 1.34, un nœud `t3.medium` et un RDS MySQL `db.t3.micro`.
+1. Pour voir uniquement ce que Terraform prévoit, activer `PLAN_TERRAFORM` : Jenkins valide la configuration puis affiche le plan, sans appliquer les changements ni déployer l’application. Pour créer ou mettre à jour l’infrastructure, activer `APPLY_TERRAFORM` : Jenkins affiche d’abord le plan puis l’applique. Dans les deux cas, renseigner `EKS_API_CIDR` avec l’adresse IPv4 publique de sortie de Jenkins, au format CIDR précis (par exemple `203.0.113.10/32`).
 2. Pour déployer, activer `DEPLOY_TO_EKS`. Les images sont publiées avant le déploiement. Il faut que l’état Terraform de l’infrastructure soit toujours présent dans le workspace Jenkins `feature/inscription`.
 
 Terraform crée une base RDS `skidb` vide et demande à AWS de générer/gérer le mot de passe principal dans Secrets Manager. Au déploiement, Jenkins lit ce secret en mémoire, le transmet dans un Secret Kubernetes temporaire et nettoie ses fichiers temporaires. Les clés AWS ne sont jamais écrites dans les manifests. L’application crée/synchronise actuellement le schéma initial avec Hibernate `ddl-auto=update` dans Kubernetes ; pour un environnement de production, remplacer ce mécanisme par des migrations versionnées avant le déploiement.

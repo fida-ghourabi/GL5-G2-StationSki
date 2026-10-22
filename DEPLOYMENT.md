@@ -29,7 +29,7 @@ Les tests backend sont exécutés par `./mvnw clean verify`. Cela compile, exéc
 
 Le pipeline publie par défaut le JAR snapshot à Nexus et les images taguées de manière unique à Docker Hub. Désactiver `PUBLISH_NEXUS` ou `PUSH_IMAGES` au lancement si nécessaire. L’image `latest` n’est pas mise à jour automatiquement.
 
-Les étapes AWS sont désactivées par défaut :
+Le plan Terraform est activé par défaut : Jenkins vérifie la configuration et affiche les changements prévus, sans modifier AWS. `APPLY_TERRAFORM` et `DEPLOY_TO_EKS` restent désactivés par défaut :
 
 1. Pour voir uniquement ce que Terraform prévoit, activer `PLAN_TERRAFORM` : Jenkins valide la configuration puis affiche le plan, sans appliquer les changements ni déployer l’application. Pour créer ou mettre à jour l’infrastructure, activer `APPLY_TERRAFORM` : Jenkins affiche d’abord le plan puis l’applique. Dans les deux cas, renseigner `EKS_API_CIDR` avec l’adresse IPv4 publique de sortie de Jenkins, au format CIDR précis (par exemple `203.0.113.10/32`).
 2. Pour déployer, activer `DEPLOY_TO_EKS`. Les images sont publiées avant le déploiement. Il faut que l’état Terraform de l’infrastructure soit toujours présent dans le workspace Jenkins `feature/inscription`.

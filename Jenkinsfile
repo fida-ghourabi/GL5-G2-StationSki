@@ -12,7 +12,7 @@ pipeline {
         booleanParam(name: 'RUN_SONAR', defaultValue: true, description: 'Analyser le backend sur SonarQube.')
         booleanParam(name: 'PUBLISH_NEXUS', defaultValue: true, description: 'Publier le JAR dans le dépôt Maven Nexus.')
         booleanParam(name: 'PUSH_IMAGES', defaultValue: true, description: 'Publier les images backend et frontend sur Docker Hub.')
-        booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Vérifier Terraform et afficher le plan sans appliquer ni déployer.')
+        booleanParam(name: 'PLAN_TERRAFORM', defaultValue: true, description: 'Vérifier Terraform et afficher le plan sans appliquer ni déployer.')
         booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Créer ou mettre à jour VPC, EKS et RDS (coûts AWS).')
         booleanParam(name: 'DEPLOY_TO_EKS', defaultValue: false, description: 'Déployer les images sur le cluster EKS.')
         string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'Région du Learner Lab.')

@@ -244,6 +244,9 @@ pipeline {
             junit allowEmptyResults: true, testResults: 'backend/target/surefire-reports/*.xml'
             archiveArtifacts artifacts: 'backend/target/site/jacoco/**,backend/target/surefire-reports/*.xml',
                              allowEmptyArchive: true
+            dir('backend') {
+                sh './mvnw -B clean'
+            }
             sh 'docker logout >/dev/null 2>&1 || true'
         }
         success {

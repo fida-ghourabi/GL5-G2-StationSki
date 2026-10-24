@@ -98,6 +98,16 @@ class RegistrationServicesTest {
     }
 
     @Test
+    void registerSlotRejectsCancelledSlot() {
+        openSlot.setStatus(SlotStatus.CANCELLED);
+        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
+                () -> service.registerSlot(10L, 30L)).getStatus());
+        verify(registrations, never()).save(any(Registration.class));
+    }
+
+    @Test
     void registerSlotRequiresDateOfBirth() {
         adult.setDateOfBirth(null);
         prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
@@ -268,6 +278,21 @@ class RegistrationServicesTest {
 
         assertDoesNotThrow(() -> service.cancel(41L));
         assertEquals(SlotStatus.OPEN, openSlot.getStatus());
+    }
+
+    @Test
+    void cancelOnCancelledSlotDoesNotReopenIt() {
+        openSlot.setStatus(SlotStatus.CANCELLED);
+        Registration registration = registration(adult, openSlot, adultCourse, false);
+        registration.setNumRegistration(45L);
+        when(registrations.findById(45L)).thenReturn(Optional.of(registration));
+        when(skiers.lockById(10L)).thenReturn(Optional.of(adult));
+        when(slots.lockById(30L)).thenReturn(Optional.of(openSlot));
+
+        service.cancel(45L);
+
+        assertTrue(registration.isCancelled());
+        assertEquals(SlotStatus.CANCELLED, openSlot.getStatus());
     }
 
     @Test

@@ -44,9 +44,9 @@ public class RegistrationRestController {
         return registrationServices.addRegistrationAndAssignToSkier(toRegistration(input),numSkieur);
     }
     @Operation(description = "Assign Registration to Course")
-    @PutMapping("/assignToCourse/{numRegis}/{numSkieur}")
-    public Registration assignToCourse( @PathVariable("numRegis") Long numRegistration,
-                                        @PathVariable("numSkieur") Long numCourse){
+    @PutMapping("/assignToCourse/{numRegis}/{numCourse}")
+    public Registration assignToCourse(@PathVariable("numRegis") Long numRegistration,
+                                       @PathVariable("numCourse") Long numCourse) {
         return registrationServices.assignRegistrationToCourse(numRegistration, numCourse);
     }
 

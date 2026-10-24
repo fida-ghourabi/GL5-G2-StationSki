@@ -231,6 +231,21 @@ pipeline {
                             done
                             test -n "$frontend_host"
                             printf 'Frontend URL: http://%s\\n' "$frontend_host"
+                            command -v curl >/dev/null 2>&1 || { echo 'curl est requis pour le smoke test EKS.' >&2; exit 1; }
+                            api_url="http://$frontend_host/stationSki/registration/skier/1"
+                            api_status=""
+                            for attempt in $(seq 1 12); do
+                                api_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                                    --connect-timeout 5 --max-time 15 "$api_url" || true)"
+                                case "$api_status" in
+                                    2??|404) break ;;
+                                esac
+                                sleep 5
+                            done
+                            case "$api_status" in
+                                2??|404) printf 'Smoke test API réussi : HTTP %s\n' "$api_status" ;;
+                                *) echo "Smoke test API échoué : HTTP ${api_status:-aucune réponse} sur $api_url" >&2; exit 1 ;;
+                            esac
                             kubectl get deployments,services,pods --namespace stationski
                         '''
                     }

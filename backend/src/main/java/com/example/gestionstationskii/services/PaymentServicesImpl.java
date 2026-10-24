@@ -67,10 +67,22 @@ public class PaymentServicesImpl implements IPaymentServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<Payment> bySkier(Long id) { Checks.id(id); if (!skiers.existsById(id)) throw BusinessException.missing("Skieur"); return payments.findBySkierNumSkier(id); }
+    public List<Payment> bySkier(Long id) {
+        Checks.id(id);
+        if (!skiers.existsById(id)) {
+            throw BusinessException.missing("Skieur");
+        }
+        return payments.findBySkierNumSkier(id);
+    }
     @Override
     @Transactional(readOnly = true)
-    public List<Payment> bySubscription(Long id) { Checks.id(id); if (!subscriptions.existsById(id)) throw BusinessException.missing("Abonnement"); return payments.findBySubscriptionNumSub(id); }
+    public List<Payment> bySubscription(Long id) {
+        Checks.id(id);
+        if (!subscriptions.existsById(id)) {
+            throw BusinessException.missing("Abonnement");
+        }
+        return payments.findBySubscriptionNumSub(id);
+    }
     @Override
     @Transactional(readOnly = true)
     public List<Refund> refunds(Long id) { get(id); return refunds.findByPaymentId(id); }

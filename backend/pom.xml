@@ -15,7 +15,6 @@
 <description>gestion-station-skii</description>
 <properties>
        <java.version>1.8</java.version>
-       <test.excluded.groups>concurrency</test.excluded.groups>
        <!-- Jenkins tourne en Java 21 : versions récentes de Lombok et Byte Buddy -->
        <lombok.version>1.18.34</lombok.version>
        <byte-buddy.version>1.14.18</byte-buddy.version>
@@ -81,13 +80,6 @@
 
 <build>
     <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-                <excludedGroups>${test.excluded.groups}</excludedGroups>
-            </configuration>
-        </plugin>
         <plugin>
             <groupId>org.jacoco</groupId>
             <artifactId>jacoco-maven-plugin</artifactId>

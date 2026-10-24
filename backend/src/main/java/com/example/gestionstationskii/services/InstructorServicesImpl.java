@@ -65,7 +65,7 @@ public class InstructorServicesImpl implements IInstructorServices {
         Checks.id(id); Checks.id(courseId);
         Course course = courseRepository.lockById(courseId).orElseThrow(() -> BusinessException.missing("Cours"));
         Instructor instructor = retrieveInstructor(id);
-        if (!instructorRepository.findByCourses_NumCourse(courseId).isEmpty()) throw BusinessException.conflict("Cours déjà associé à un moniteur");
+        if (!instructorRepository.findByCoursesNumCourse(courseId).isEmpty()) throw BusinessException.conflict("Cours déjà associé à un moniteur");
         instructor.getCourses().add(course);
         return instructorRepository.save(instructor);
     }
@@ -83,7 +83,7 @@ public class InstructorServicesImpl implements IInstructorServices {
     @Override
     public void removeInstructor(Long id) {
         Instructor instructor = retrieveInstructor(id);
-        if (!instructor.getCourses().isEmpty() || slotRepository.existsByInstructor_NumInstructor(id) || availabilityRepository.existsByInstructor_NumInstructor(id))
+        if (!instructor.getCourses().isEmpty() || slotRepository.existsByInstructorNumInstructor(id) || availabilityRepository.existsByInstructorNumInstructor(id))
             throw BusinessException.conflict("Moniteur associé à des cours, créneaux ou disponibilités : suppression refusée");
         instructorRepository.delete(instructor);
     }

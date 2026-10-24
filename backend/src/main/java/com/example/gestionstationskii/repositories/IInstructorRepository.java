@@ -12,6 +12,6 @@ public interface IInstructorRepository extends JpaRepository<Instructor, Long> {
     @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select i from Instructor i where i.numInstructor = :id")
     java.util.Optional<Instructor> lockById(@org.springframework.data.repository.query.Param("id") Long id);
-    java.util.List<Instructor> findByCourses_NumCourse(Long courseId);
+    java.util.List<Instructor> findByCoursesNumCourse(Long courseId);
 
 }

@@ -1,6 +1,7 @@
 package com.example.gestionstationskii.controllers;
 
 import com.example.gestionstationskii.entities.Course;
+import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.services.ICourseServices;
 import com.example.gestionstationskii.entities.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,8 +44,8 @@ public class CourseRestController {
 
     @Operation(description = "Add Course")
     @PostMapping("/add")
-    public Course addCourse(@RequestBody Course course){
-        return  courseServices.addCourse(course);
+    public Course addCourse(@RequestBody Requests.CourseInput input){
+        return courseServices.addCourse(toCourse(input));
     }
 
     @Operation(description = "Retrieve all Courses")
@@ -55,14 +56,24 @@ public class CourseRestController {
 
     @Operation(description = "Update Course ")
     @PutMapping("/update")
-    public Course updateCourse(@RequestBody Course course){
-        return  courseServices.updateCourse(course);
+    public Course updateCourse(@RequestBody Requests.CourseInput input){
+        return courseServices.updateCourse(toCourse(input));
     }
 
     @Operation(description = "Retrieve Course by Id")
     @GetMapping("/get/{id-course}")
     public Course getById(@PathVariable("id-course") Long numCourse){
         return courseServices.retrieveCourse(numCourse);
+    }
+
+    private static Course toCourse(Requests.CourseInput input) {
+        Course course = new Course();
+        course.setNumCourse(input.getNumCourse());
+        course.setLevel(input.getLevel());
+        course.setTypeCourse(input.getTypeCourse());
+        course.setSupport(input.getSupport());
+        course.setPrice(input.getPrice());
+        return course;
     }
 
 }

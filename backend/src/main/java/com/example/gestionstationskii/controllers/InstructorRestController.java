@@ -1,6 +1,7 @@
 package com.example.gestionstationskii.controllers;
 
 import com.example.gestionstationskii.services.*;
+import com.example.gestionstationskii.dto.Requests;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -40,13 +41,13 @@ public class InstructorRestController {
 
     @Operation(description = "Add Instructor")
     @PostMapping("/add")
-    public Instructor addInstructor(@RequestBody Instructor instructor){
-        return  instructorServices.addInstructor(instructor);
+    public Instructor addInstructor(@RequestBody Requests.InstructorInput input){
+        return instructorServices.addInstructor(toInstructor(input));
     }
     @Operation(description = "Add Instructor and Assign To Course")
     @PutMapping("/addAndAssignToCourse/{numCourse}")
-    public Instructor addAndAssignToInstructor(@RequestBody Instructor instructor, @PathVariable("numCourse")Long numCourse){
-        return  instructorServices.addInstructorAndAssignToCourse(instructor,numCourse);
+    public Instructor addAndAssignToInstructor(@RequestBody Requests.InstructorInput input, @PathVariable("numCourse")Long numCourse){
+        return instructorServices.addInstructorAndAssignToCourse(toInstructor(input),numCourse);
     }
     @Operation(description = "Retrieve all Instructors")
     @GetMapping("/all")
@@ -56,14 +57,23 @@ public class InstructorRestController {
 
     @Operation(description = "Update Instructor ")
     @PutMapping("/update")
-    public Instructor updateInstructor(@RequestBody Instructor Instructor){
-        return  instructorServices.updateInstructor(Instructor);
+    public Instructor updateInstructor(@RequestBody Requests.InstructorInput input){
+        return instructorServices.updateInstructor(toInstructor(input));
     }
 
     @Operation(description = "Retrieve Instructor by Id")
     @GetMapping("/get/{id-instructor}")
     public Instructor getById(@PathVariable("id-instructor") Long numInstructor){
         return instructorServices.retrieveInstructor(numInstructor);
+    }
+
+    private static Instructor toInstructor(Requests.InstructorInput input) {
+        Instructor instructor = new Instructor();
+        instructor.setNumInstructor(input.getNumInstructor());
+        instructor.setFirstName(input.getFirstName());
+        instructor.setLastName(input.getLastName());
+        instructor.setDateOfHire(input.getDateOfHire());
+        return instructor;
     }
 
 }

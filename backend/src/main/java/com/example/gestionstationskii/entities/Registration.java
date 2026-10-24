@@ -29,14 +29,14 @@ public class Registration implements Serializable {
 	@Column(nullable = false, columnDefinition = "boolean default false")
 	boolean cancelled;
 	@ManyToOne
-	PlanningSlot planningSlot;
+	private PlanningSlot planningSlot;
 
 	@JsonIgnore
 	@ManyToOne
-    Skier skier;
+	private Skier skier;
 	@JsonIgnore
 	@ManyToOne
-	Course course;
+	private Course course;
 
 	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
 	public Long getSkierId() { return skier == null ? null : skier.getNumSkier(); }

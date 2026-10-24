@@ -38,8 +38,10 @@ class RegistrationServiceIntegrationTest extends RegistrationIntegrationSupport 
         PlanningSlot nextWeek = createSlotAt(course, instructor, monday.plusWeeks(1), 4);
 
         Registration firstRegistration = registrationServices.registerSlot(skier.getNumSkier(), first.getId());
+        Long skierId = skier.getNumSkier();
+        Long sameWeekSlotId = sameWeek.getId();
         assertThrows(BusinessException.class,
-                () -> registrationServices.registerSlot(skier.getNumSkier(), sameWeek.getId()));
+                () -> registrationServices.registerSlot(skierId, sameWeekSlotId));
         Registration nextWeekRegistration = registrationServices.registerSlot(skier.getNumSkier(), nextWeek.getId());
 
         List<Registration> results = registrationServices.search(monday.minusHours(1), monday.plusHours(2), course.getNumCourse());
@@ -64,7 +66,8 @@ class RegistrationServiceIntegrationTest extends RegistrationIntegrationSupport 
         child = skiers.saveAndFlush(child);
         Long childId = child.getNumSkier();
 
-        assertThrows(BusinessException.class, () -> registrationServices.registerSlot(childId, adultSlot.getId()));
+        Long adultSlotId = adultSlot.getId();
+        assertThrows(BusinessException.class, () -> registrationServices.registerSlot(childId, adultSlotId));
         assertNotNull(registrationServices.registerSlot(childId, childrenSlot.getId()));
     }
 }

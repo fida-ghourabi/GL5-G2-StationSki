@@ -27,8 +27,8 @@ class BusinessRulesTest {
         PlanningSlot slot = new PlanningSlot(); slot.setId(2L); slot.setCourse(course); slot.setStatus(SlotStatus.OPEN); slot.setMaxCapacity(6);
         slot.setStartTime(LocalDateTime.now().plusDays(1)); slot.setEndTime(slot.getStartTime().plusHours(1));
         when(skiers.lockById(1L)).thenReturn(Optional.of(skier)); when(slots.lockById(2L)).thenReturn(Optional.of(slot));
-        when(registrations.findBySkier_NumSkier(1L)).thenReturn(Collections.emptyList());
-        when(registrations.findByPlanningSlot_Id(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
+        when(registrations.findBySkierNumSkier(1L)).thenReturn(Collections.emptyList());
+        when(registrations.findByPlanningSlotId(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class, () -> service.registerSlot(1L, 2L)).getStatus());
         verify(registrations, never()).save(any(Registration.class));
     }
@@ -48,7 +48,7 @@ class BusinessRulesTest {
         PlanningSlot existing = new PlanningSlot(); existing.setId(5L); existing.setInstructor(instructor); existing.setStatus(SlotStatus.OPEN);
         existing.setStartTime(day.atTime(10, 0)); existing.setEndTime(day.atTime(12, 0));
         when(courses.lockById(1L)).thenReturn(Optional.of(course)); when(instructors.lockById(1L)).thenReturn(Optional.of(instructor));
-        when(instructors.findById(1L)).thenReturn(Optional.of(instructor)); when(availability.findByInstructor_NumInstructor(1L)).thenReturn(Collections.singletonList(a));
+        when(instructors.findById(1L)).thenReturn(Optional.of(instructor)); when(availability.findByInstructorNumInstructor(1L)).thenReturn(Collections.singletonList(a));
         when(slots.findAll()).thenReturn(Collections.singletonList(existing));
         Requests.Slot input = new Requests.Slot(); input.setCourseId(1L); input.setInstructorId(1L); input.setMaxCapacity(6);
         input.setStartTime(day.atTime(11, 0)); input.setEndTime(day.atTime(13, 0));
@@ -90,7 +90,7 @@ class BusinessRulesTest {
         p.setAmount(new BigDecimal("100.00")); p.setRefundedAmount(new BigDecimal("25.00")); p.setStatus(PaymentStatus.PARTIALLY_REFUNDED);
         p.setPaidAt(LocalDateTime.of(2026, 1, 15, 10, 0));
         Refund r = new Refund(); r.setAmount(new BigDecimal("25.00"));
-        when(payments.findById(1L)).thenReturn(Optional.of(p)); when(refunds.findByPayment_Id(1L)).thenReturn(Collections.singletonList(r));
+        when(payments.findById(1L)).thenReturn(Optional.of(p)); when(refunds.findByPaymentId(1L)).thenReturn(Collections.singletonList(r));
         PaymentReceipt receipt = service.receipt(1L);
         assertEquals("SKI-TEST", receipt.getReceiptNumber());
         assertEquals("Amina Test", receipt.getSkierName());
@@ -125,7 +125,7 @@ class BusinessRulesTest {
         Skier skier = new Skier(); skier.setFirstName("Amina"); skier.setLastName("Test"); skier.setCity("Tunis"); skier.setDateOfBirth(LocalDate.of(2000, 1, 1));
         Subscription sub = new Subscription(); skier.setSubscription(sub);
         PlanningSlot slot = new PlanningSlot(); slot.setId(3L);
-        when(courses.findById(2L)).thenReturn(Optional.of(new Course()));
+        when(courses.existsById(2L)).thenReturn(true);
         when(subscriptions.addSubscription(sub)).thenReturn(sub);
         when(skiers.save(skier)).thenAnswer(invocation -> { skier.setNumSkier(1L); return skier; });
         when(registrations.nextAvailableSlot(2L)).thenReturn(slot);

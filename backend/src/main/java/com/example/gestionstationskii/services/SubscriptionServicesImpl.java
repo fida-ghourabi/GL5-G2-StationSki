@@ -16,6 +16,7 @@ import java.util.Set;
 @Service
 @Transactional
 public class SubscriptionServicesImpl implements ISubscriptionServices {
+    private static final String SUBSCRIPTION_RESOURCE = "Abonnement";
 
     private final ISubscriptionRepository subscriptionRepository;
 
@@ -48,8 +49,8 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     @Override
     public Subscription updateSubscription(Subscription subscription) {
         Checks.id(subscription.getNumSub());
-        Subscription current = subscriptionRepository.lockById(subscription.getNumSub()).orElseThrow(() -> BusinessException.missing("Abonnement"));
-        if (paymentRepository.existsBySubscription_NumSub(current.getNumSub()))
+        Subscription current = subscriptionRepository.lockById(subscription.getNumSub()).orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
+        if (paymentRepository.existsBySubscriptionNumSub(current.getNumSub()))
             throw BusinessException.conflict("Abonnement lié à un paiement : historique immuable");
         validate(subscription);
         current.setStartDate(subscription.getStartDate());
@@ -63,7 +64,7 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     @Transactional(readOnly = true)
     public Subscription retrieveSubscriptionById(Long numSubscription) {
         Checks.id(numSubscription);
-        return subscriptionRepository.findById(numSubscription).orElseThrow(() -> BusinessException.missing("Abonnement"));
+        return subscriptionRepository.findById(numSubscription).orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
     }
 
     @Override
@@ -94,8 +95,8 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     @Override
     public void removeSubscription(Long id) {
         Checks.id(id);
-        Subscription sub = subscriptionRepository.lockById(id).orElseThrow(() -> BusinessException.missing("Abonnement"));
-        if (paymentRepository.existsBySubscription_NumSub(id) || skierRepository.findBySubscription(sub) != null)
+        Subscription sub = subscriptionRepository.lockById(id).orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
+        if (paymentRepository.existsBySubscriptionNumSub(id) || skierRepository.findBySubscription(sub) != null)
             throw BusinessException.conflict("Abonnement affecté ou lié à un paiement : suppression refusée");
         subscriptionRepository.delete(sub);
     }
@@ -106,6 +107,8 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
         Subscription sub = retrieveSubscriptionById(id);
         Checks.require(asOf != null, "Date de référence requise");
         if (sub.getStartDate() == null || sub.getEndDate() == null) throw BusinessException.conflict("Abonnement historique sans dates : corriger les données");
-        return asOf.isBefore(sub.getStartDate()) ? "UPCOMING" : (!asOf.isBefore(sub.getEndDate()) ? "EXPIRED" : "ACTIVE");
+        if (asOf.isBefore(sub.getStartDate())) return "UPCOMING";
+        if (!asOf.isBefore(sub.getEndDate())) return "EXPIRED";
+        return "ACTIVE";
     }
 }

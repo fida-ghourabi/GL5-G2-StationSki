@@ -2,7 +2,6 @@ package com.example.gestionstationskii.repositories;
 
 import com.example.gestionstationskii.entities.*;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -10,12 +9,12 @@ import java.util.List;
 @Repository
 
 public interface IRegistrationRepository extends org.springframework.data.jpa.repository.JpaRepository<Registration, Long> {
-    List<Registration> findBySkier_NumSkier(Long skierId);
-    List<Registration> findByCourse_NumCourse(Long courseId);
-    List<Registration> findByPlanningSlot_Id(Long slotId);
-    long countByPlanningSlot_Id(Long slotId);
-    boolean existsBySkier_NumSkier(Long skierId);
-    boolean existsByCourse_NumCourse(Long courseId);
+    List<Registration> findBySkierNumSkier(Long skierId);
+    List<Registration> findByCourseNumCourse(Long courseId);
+    List<Registration> findByPlanningSlotId(Long slotId);
+    long countByPlanningSlotId(Long slotId);
+    boolean existsBySkierNumSkier(Long skierId);
+    boolean existsByCourseNumCourse(Long courseId);
 
     long countByCourseAndNumWeek(Course course, int numWeek);
     @Query("select distinct reg.numWeek from Instructor ins join ins.courses c, Registration reg " +
@@ -24,9 +23,8 @@ public interface IRegistrationRepository extends org.springframework.data.jpa.re
 
     @Query("select count(distinct r) from Registration r " +
             "where r.numWeek = ?1 and r.skier.numSkier = ?2 and r.course.numCourse = ?3")
-    long countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(int numWeek, Long numSkier, Long numCourse);
+    long countDistinctByNumWeekAndSkierNumSkierAndCourseNumCourse(int numWeek, Long numSkier, Long numCourse);
 
-  //  long countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(int numWeek, Long numSkier, Long numCourse);
 
 
 

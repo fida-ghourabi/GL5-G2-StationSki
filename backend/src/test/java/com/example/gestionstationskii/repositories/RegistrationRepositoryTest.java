@@ -82,16 +82,16 @@ class RegistrationRepositoryTest {
         entityManager.flush();
         entityManager.clear();
 
-        assertEquals(2, registrations.findBySkier_NumSkier(skier.getNumSkier()).size());
-        assertEquals(2, registrations.findByCourse_NumCourse(course.getNumCourse()).size());
-        assertEquals(2, registrations.findByPlanningSlot_Id(slot.getId()).size());
-        assertEquals(2, registrations.countByPlanningSlot_Id(slot.getId()));
-        assertTrue(registrations.existsBySkier_NumSkier(skier.getNumSkier()));
-        assertTrue(registrations.existsByCourse_NumCourse(course.getNumCourse()));
+        assertEquals(2, registrations.findBySkierNumSkier(skier.getNumSkier()).size());
+        assertEquals(2, registrations.findByCourseNumCourse(course.getNumCourse()).size());
+        assertEquals(2, registrations.findByPlanningSlotId(slot.getId()).size());
+        assertEquals(2, registrations.countByPlanningSlotId(slot.getId()));
+        assertTrue(registrations.existsBySkierNumSkier(skier.getNumSkier()));
+        assertTrue(registrations.existsByCourseNumCourse(course.getNumCourse()));
         assertEquals(1L, registrations.countByCourseAndNumWeek(course, 2));
-        assertEquals(1L, registrations.countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(
+        assertEquals(1L, registrations.countDistinctByNumWeekAndSkierNumSkierAndCourseNumCourse(
                 2, skier.getNumSkier(), course.getNumCourse()));
-        assertEquals(0L, registrations.countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(
+        assertEquals(0L, registrations.countDistinctByNumWeekAndSkierNumSkierAndCourseNumCourse(
                 2, 999L, course.getNumCourse()));
         assertNotEquals(active.getNumRegistration(), cancelled.getNumRegistration());
     }

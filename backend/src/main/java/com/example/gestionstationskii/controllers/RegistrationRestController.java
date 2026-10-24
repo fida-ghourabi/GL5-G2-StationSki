@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.services.*;
 import com.example.gestionstationskii.entities.*;
 
@@ -37,10 +38,10 @@ public class RegistrationRestController {
 
     @Operation(description = "Add Registration and Assign to Skier")
     @PutMapping("/addAndAssignToSkier/{numSkieur}")
-    public Registration addAndAssignToSkier(@RequestBody Registration registration,
+    public Registration addAndAssignToSkier(@RequestBody Requests.RegistrationInput input,
                                                      @PathVariable("numSkieur") Long numSkieur)
     {
-        return  registrationServices.addRegistrationAndAssignToSkier(registration,numSkieur);
+        return registrationServices.addRegistrationAndAssignToSkier(toRegistration(input),numSkieur);
     }
     @Operation(description = "Assign Registration to Course")
     @PutMapping("/assignToCourse/{numRegis}/{numSkieur}")
@@ -52,11 +53,11 @@ public class RegistrationRestController {
 
     @Operation(description = "Add Registration and Assign to Skier and Course")
     @PutMapping("/addAndAssignToSkierAndCourse/{numSkieur}/{numCourse}")
-    public Registration addAndAssignToSkierAndCourse(@RequestBody Registration registration,
+    public Registration addAndAssignToSkierAndCourse(@RequestBody Requests.RegistrationInput input,
                                                      @PathVariable("numSkieur") Long numSkieur,
                                                      @PathVariable("numCourse") Long numCourse)
     {
-        return  registrationServices.addRegistrationAndAssignToSkierAndCourse(registration,numSkieur,numCourse);
+        return registrationServices.addRegistrationAndAssignToSkierAndCourse(toRegistration(input),numSkieur,numCourse);
     }
 
     @Operation(description = "Numbers of the weeks when an instructor has given lessons in a given support")
@@ -64,5 +65,16 @@ public class RegistrationRestController {
     public List<Integer> numWeeksCourseOfInstructorBySupport(@PathVariable("numInstructor")Long numInstructor,
                                                                   @PathVariable("support") Support support) {
         return registrationServices.numWeeksCourseOfInstructorBySupport(numInstructor,support);
+    }
+
+    private static Registration toRegistration(Requests.RegistrationInput input) {
+        Registration registration = new Registration();
+        registration.setNumWeek(input.getNumWeek());
+        if (input.getPlanningSlot() != null) {
+            PlanningSlot slot = new PlanningSlot();
+            slot.setId(input.getPlanningSlot().getId());
+            registration.setPlanningSlot(slot);
+        }
+        return registration;
     }
 }

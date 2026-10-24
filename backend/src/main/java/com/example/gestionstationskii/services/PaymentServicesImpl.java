@@ -20,7 +20,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     private final ISubscriptionRepository subscriptions;
 
     @Override
-    public Payment record(Requests.PaymentInput input) {
+    public Payment recordPayment(Requests.PaymentInput input) {
         Checks.id(input.getSkierId()); Checks.id(input.getSubscriptionId()); Checks.money(input.getAmount());
         Checks.require(input.getAmount().signum() > 0 && input.getMethod() != null, "Montant strictement positif et moyen de paiement requis");
         Skier skier = skiers.lockById(input.getSkierId()).orElseThrow(() -> BusinessException.missing("Skieur"));
@@ -67,13 +67,13 @@ public class PaymentServicesImpl implements IPaymentServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<Payment> bySkier(Long id) { Checks.id(id); skiers.findById(id).orElseThrow(() -> BusinessException.missing("Skieur")); return payments.findBySkier_NumSkier(id); }
+    public List<Payment> bySkier(Long id) { Checks.id(id); if (!skiers.existsById(id)) throw BusinessException.missing("Skieur"); return payments.findBySkierNumSkier(id); }
     @Override
     @Transactional(readOnly = true)
-    public List<Payment> bySubscription(Long id) { Checks.id(id); subscriptions.findById(id).orElseThrow(() -> BusinessException.missing("Abonnement")); return payments.findBySubscription_NumSub(id); }
+    public List<Payment> bySubscription(Long id) { Checks.id(id); if (!subscriptions.existsById(id)) throw BusinessException.missing("Abonnement"); return payments.findBySubscriptionNumSub(id); }
     @Override
     @Transactional(readOnly = true)
-    public List<Refund> refunds(Long id) { get(id); return refunds.findByPayment_Id(id); }
+    public List<Refund> refunds(Long id) { get(id); return refunds.findByPaymentId(id); }
     @Override
     @Transactional(readOnly = true)
     public PaymentReceipt receipt(Long id) {
@@ -81,6 +81,6 @@ public class PaymentServicesImpl implements IPaymentServices {
         return new PaymentReceipt(p.getReceiptNumber(), p.getId(), p.getSkier().getNumSkier(),
                 p.getSkier().getFirstName() + " " + p.getSkier().getLastName(), p.getSubscription().getNumSub(),
                 p.getPaymentDate(), p.getPaidAt(), p.getMethod(), p.getStatus(), p.getAmount(), p.getRefundedAmount(),
-                p.getPaidAt() == null ? BigDecimal.ZERO : p.getAmount().subtract(p.getRefundedAmount()), refunds.findByPayment_Id(id));
+                p.getPaidAt() == null ? BigDecimal.ZERO : p.getAmount().subtract(p.getRefundedAmount()), refunds.findByPaymentId(id));
     }
 }

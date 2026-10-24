@@ -62,7 +62,7 @@ class RegistrationConcurrencyTest extends RegistrationIntegrationSupport {
             }
 
             assertEquals(capacity, accepted);
-            assertEquals((long) capacity, registrations.countByPlanningSlot_Id(slot.getId()));
+            assertEquals((long) capacity, registrations.countByPlanningSlotId(slot.getId()));
             assertEquals(SlotStatus.FULL, slots.findById(slot.getId()).orElseThrow(AssertionError::new).getStatus());
         } finally {
             start.countDown();

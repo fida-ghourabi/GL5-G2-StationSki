@@ -10,7 +10,7 @@ import java.util.List;
 public class PaymentRestController {
     private final IPaymentServices service;
     @Operation(summary = "Enregistrer un paiement local au statut PENDING") @PostMapping
-    public Payment record(@RequestBody Requests.PaymentInput input) { return service.record(input); }
+    public Payment recordPayment(@RequestBody Requests.PaymentInput input) { return service.recordPayment(input); }
     @Operation(summary = "Consulter un paiement") @GetMapping("/{id}")
     public Payment get(@PathVariable Long id) { return service.get(id); }
     @Operation(summary = "Paiements d'un skieur") @GetMapping("/skier/{skierId}")

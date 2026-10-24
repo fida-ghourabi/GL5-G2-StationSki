@@ -7,9 +7,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Payment p where p.id = :id")
     Optional<Payment> lockById(@Param("id") Long id);
-    List<Payment> findBySkier_NumSkier(Long id);
-    List<Payment> findBySubscription_NumSub(Long id);
-    boolean existsBySkier_NumSkier(Long id);
-    boolean existsBySubscription_NumSub(Long id);
+    List<Payment> findBySkierNumSkier(Long id);
+    List<Payment> findBySubscriptionNumSub(Long id);
+    boolean existsBySkierNumSkier(Long id);
+    boolean existsBySubscriptionNumSub(Long id);
     boolean existsByTransactionReference(String reference);
 }

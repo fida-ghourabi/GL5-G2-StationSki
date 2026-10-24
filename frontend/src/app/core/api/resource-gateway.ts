@@ -69,7 +69,6 @@ export class ResourceGateway {
   async save(def: ResourceDefinition, values: Command, row?: Entity): Promise<Entity> {
     if (def.key === 'registrations') return firstValueFrom(this.registrations.register(Number(values['skierId']), Number(values['slotId'])));
     const body = { ...values };
-    if (def.key === 'courses') body['timeSlot'] = row?.['timeSlot'] ?? 0;
     if (row) {
       body[def.idKey] = row[def.idKey];
       const path = `${def.updatePath}${def.updatePath?.endsWith('/') ? row[def.idKey] : ''}`;

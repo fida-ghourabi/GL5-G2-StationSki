@@ -36,11 +36,11 @@ public class CourseServicesImpl implements ICourseServices {
         validate(course);
         Checks.id(course.getNumCourse());
         Course current = courseRepository.lockById(course.getNumCourse()).orElseThrow(() -> BusinessException.missing("Cours"));
-        if ((registrationRepository.existsByCourse_NumCourse(current.getNumCourse()) || slotRepository.existsByCourse_NumCourse(current.getNumCourse()))
+        if ((registrationRepository.existsByCourseNumCourse(current.getNumCourse()) || slotRepository.existsByCourseNumCourse(current.getNumCourse()))
                 && (current.getTypeCourse() != course.getTypeCourse() || current.getSupport() != course.getSupport() || current.getLevel() != course.getLevel()))
             throw BusinessException.conflict("Type, support et niveau immuables pour un cours planifié ou ayant des inscriptions");
         current.setLevel(course.getLevel()); current.setTypeCourse(course.getTypeCourse()); current.setSupport(course.getSupport());
-        current.setPrice(course.getPrice()); current.setTimeSlot(course.getTimeSlot());
+        current.setPrice(course.getPrice());
         return courseRepository.save(current);
     }
 
@@ -54,13 +54,12 @@ public class CourseServicesImpl implements ICourseServices {
     private void validate(Course course) {
         Checks.require(course.getLevel() > 0 && course.getTypeCourse() != null && course.getSupport() != null, "Niveau positif, type et support requis");
         Checks.price(course.getPrice());
-        Checks.require(course.getTimeSlot() >= 0, "Ancien timeSlot positif ou nul requis");
     }
     @Override
     public void removeCourse(Long id) {
         Course course = retrieveCourse(id);
-        if (registrationRepository.existsByCourse_NumCourse(id) || slotRepository.existsByCourse_NumCourse(id)
-                || !instructorRepository.findByCourses_NumCourse(id).isEmpty())
+        if (registrationRepository.existsByCourseNumCourse(id) || slotRepository.existsByCourseNumCourse(id)
+                || !instructorRepository.findByCoursesNumCourse(id).isEmpty())
             throw BusinessException.conflict("Cours associé à un moniteur, des inscriptions ou des créneaux : suppression refusée");
         courseRepository.delete(course);
     }
@@ -74,7 +73,7 @@ public class CourseServicesImpl implements ICourseServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<Registration> registrations(Long id) { retrieveCourse(id); return registrationRepository.findByCourse_NumCourse(id); }
+    public List<Registration> registrations(Long id) { retrieveCourse(id); return registrationRepository.findByCourseNumCourse(id); }
     @Override
     @Transactional(readOnly = true)
     public long participants(Long id) {
@@ -82,7 +81,7 @@ public class CourseServicesImpl implements ICourseServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<Instructor> instructors(Long id) { retrieveCourse(id); return instructorRepository.findByCourses_NumCourse(id); }
+    public List<Instructor> instructors(Long id) { retrieveCourse(id); return instructorRepository.findByCoursesNumCourse(id); }
 
 
 }

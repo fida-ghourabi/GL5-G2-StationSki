@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.services.*;
 import com.example.gestionstationskii.entities.*;
 
@@ -32,8 +33,8 @@ public class SubscriptionRestController {
 
     @Operation(description = "Add Subscription ")
     @PostMapping("/add")
-    public Subscription addSubscription(@RequestBody Subscription subscription){
-        return  subscriptionServices.addSubscription(subscription);
+    public Subscription addSubscription(@RequestBody Requests.SubscriptionInput input){
+        return subscriptionServices.addSubscription(toSubscription(input));
     }
     @Operation(description = "Retrieve Subscription by Id")
     @GetMapping("/get/{id-subscription}")
@@ -48,14 +49,23 @@ public class SubscriptionRestController {
     }
     @Operation(description = "Update Subscription ")
     @PutMapping("/update")
-    public Subscription updateSubscription(@RequestBody Subscription subscription){
-        return  subscriptionServices.updateSubscription(subscription);
+    public Subscription updateSubscription(@RequestBody Requests.SubscriptionInput input){
+        return subscriptionServices.updateSubscription(toSubscription(input));
     }
     @Operation(description = "Retrieve Subscriptions created between two dates")
     @GetMapping("/all/{date1}/{date2}")
     public List<Subscription> getSubscriptionsByDates(@PathVariable("date1") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                       @PathVariable("date2") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate){
         return subscriptionServices.retrieveSubscriptionsByDates(startDate, endDate);
+    }
+
+    private static Subscription toSubscription(Requests.SubscriptionInput input) {
+        Subscription subscription = new Subscription();
+        subscription.setNumSub(input.getNumSub());
+        subscription.setStartDate(input.getStartDate());
+        subscription.setPrice(input.getPrice());
+        subscription.setTypeSub(input.getTypeSub());
+        return subscription;
     }
 
 }

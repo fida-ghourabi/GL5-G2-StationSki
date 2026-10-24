@@ -296,12 +296,12 @@ class RegistrationServicesTest {
 
     @Test
     void bySkierValidatesSkierAndReturnsRepositoryHistory() {
-        when(skiers.findById(10L)).thenReturn(Optional.of(adult));
+        when(skiers.existsById(10L)).thenReturn(true);
         List<Registration> history = Collections.singletonList(registration(adult, openSlot, adultCourse, false));
-        when(registrations.findBySkier_NumSkier(10L)).thenReturn(history);
+        when(registrations.findBySkierNumSkier(10L)).thenReturn(history);
 
         assertSame(history, service.bySkier(10L));
-        when(skiers.findById(99L)).thenReturn(Optional.empty());
+        when(skiers.existsById(99L)).thenReturn(false);
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class, () -> service.bySkier(99L)).getStatus());
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class, () -> service.bySkier(0L)).getStatus());
     }
@@ -318,18 +318,19 @@ class RegistrationServicesTest {
         when(registrations.findAll()).thenReturn(Arrays.asList(included, excludedByDate, historical));
 
         assertEquals(Collections.singletonList(included), service.search(from, to, null));
-        when(courses.findById(20L)).thenReturn(Optional.of(adultCourse));
+        when(courses.existsById(20L)).thenReturn(true);
         assertEquals(Collections.singletonList(included), service.search(from, to, 20L));
     }
 
     @Test
     void searchRejectsInvalidRangeAndMissingCourse() {
         LocalDateTime from = LocalDateTime.now();
+        LocalDateTime to = from.plusDays(1);
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
                 () -> service.search(from, from, null)).getStatus());
-        when(courses.findById(99L)).thenReturn(Optional.empty());
+        when(courses.existsById(99L)).thenReturn(false);
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class,
-                () -> service.search(from, from.plusDays(1), 99L)).getStatus());
+                () -> service.search(from, to, 99L)).getStatus());
     }
 
     @Test
@@ -345,8 +346,7 @@ class RegistrationServicesTest {
 
     @Test
     void addAndAssignToCourseRejectsSlotFromDifferentCourse() {
-        Course otherCourse = course(60L, TypeCourse.COLLECTIVE_ADULT);
-        when(courses.findById(60L)).thenReturn(Optional.of(otherCourse));
+        when(courses.existsById(60L)).thenReturn(true);
         when(slots.findById(30L)).thenReturn(Optional.of(openSlot));
         Registration input = new Registration();
         input.setPlanningSlot(openSlot);
@@ -360,10 +360,10 @@ class RegistrationServicesTest {
     void assignRegistrationToCourseAllowsSameCourseButRejectsChangingCourse() {
         Registration existing = registration(adult, openSlot, adultCourse, false);
         when(registrations.findById(70L)).thenReturn(Optional.of(existing));
-        when(courses.findById(20L)).thenReturn(Optional.of(adultCourse));
+        when(courses.existsById(20L)).thenReturn(true);
         assertSame(existing, service.assignRegistrationToCourse(70L, 20L));
 
-        when(courses.findById(21L)).thenReturn(Optional.of(course(21L, TypeCourse.COLLECTIVE_ADULT)));
+        when(courses.existsById(21L)).thenReturn(true);
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
                 () -> service.assignRegistrationToCourse(70L, 21L)).getStatus());
         existing.setCancelled(true);
@@ -375,12 +375,10 @@ class RegistrationServicesTest {
     void instructorWeeksRequiresExistingInstructorAndSupport() {
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
                 () -> service.numWeeksCourseOfInstructorBySupport(1L, null)).getStatus());
-        when(instructors.findById(1L)).thenReturn(Optional.empty());
+        when(instructors.existsById(1L)).thenReturn(false);
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class,
                 () -> service.numWeeksCourseOfInstructorBySupport(1L, Support.SKI)).getStatus());
-        Instructor instructor = new Instructor();
-        instructor.setNumInstructor(1L);
-        when(instructors.findById(1L)).thenReturn(Optional.of(instructor));
+        when(instructors.existsById(1L)).thenReturn(true);
         when(registrations.numWeeksCourseOfInstructorBySupport(1L, Support.SKI)).thenReturn(Arrays.asList(1, 2));
         assertEquals(Arrays.asList(1, 2), service.numWeeksCourseOfInstructorBySupport(1L, Support.SKI));
     }
@@ -389,8 +387,8 @@ class RegistrationServicesTest {
                                      List<Registration> slotRegistrations) {
         lenient().when(skiers.lockById(skier.getNumSkier())).thenReturn(Optional.of(skier));
         lenient().when(slots.lockById(slot.getId())).thenReturn(Optional.of(slot));
-        lenient().when(registrations.findBySkier_NumSkier(skier.getNumSkier())).thenReturn(skierHistory);
-        lenient().when(registrations.findByPlanningSlot_Id(slot.getId())).thenReturn(slotRegistrations);
+        lenient().when(registrations.findBySkierNumSkier(skier.getNumSkier())).thenReturn(skierHistory);
+        lenient().when(registrations.findByPlanningSlotId(slot.getId())).thenReturn(slotRegistrations);
     }
 
     private static Skier skier(Long id, LocalDate dateOfBirth) {

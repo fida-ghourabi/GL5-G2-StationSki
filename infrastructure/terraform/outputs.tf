@@ -1,6 +1,6 @@
 output "cluster_name" {
   description = "EKS cluster name for aws eks update-kubeconfig."
-  value       = module.eks.cluster_name
+  value       = aws_eks_cluster.this.name
 }
 
 output "rds_endpoint" {

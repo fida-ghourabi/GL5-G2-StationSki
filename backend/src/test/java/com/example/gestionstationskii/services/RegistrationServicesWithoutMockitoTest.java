@@ -1,4 +1,4 @@
-package com.example.gestionstationskii.integration;
+package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.entities.Course;
 import com.example.gestionstationskii.entities.Instructor;
@@ -7,8 +7,6 @@ import com.example.gestionstationskii.entities.Registration;
 import com.example.gestionstationskii.entities.Skier;
 import com.example.gestionstationskii.entities.SlotStatus;
 import com.example.gestionstationskii.entities.Support;
-import com.example.gestionstationskii.services.BusinessException;
-import com.example.gestionstationskii.services.IRegistrationServices;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -22,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class RegistrationServiceIntegrationTest extends RegistrationIntegrationSupport {
+class RegistrationServicesWithoutMockitoTest extends RegistrationIntegrationSupport {
     @Autowired private IRegistrationServices registrationServices;
 
     @Test

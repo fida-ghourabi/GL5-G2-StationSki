@@ -1,11 +1,18 @@
-package com.example.gestionstationskii.repositories;
+package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.entities.*;
+import com.example.gestionstationskii.repositories.IRegistrationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -13,16 +20,24 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DataJpaTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:registration-repository;DB_CLOSE_DELAY=-1;MODE=MySQL",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
-})
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
 class RegistrationRepositoryTest {
+    @Container
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.33")
+            .withDatabaseName("station_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    @DynamicPropertySource
+    static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
+    }
+
     @Autowired private TestEntityManager entityManager;
     @Autowired private IRegistrationRepository registrations;
 

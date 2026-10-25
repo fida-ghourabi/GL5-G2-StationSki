@@ -27,7 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class RegistrationServicesTest {
+class RegistrationServicesMockTest {
     @Mock private IRegistrationRepository registrations;
     @Mock private ISkierRepository skiers;
     @Mock private ICourseRepository courses;

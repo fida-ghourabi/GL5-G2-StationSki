@@ -1,9 +1,9 @@
-package com.example.gestionstationskii.controllers;
+package com.example.gestionstationskii.services;
 
+import com.example.gestionstationskii.controllers.ApiExceptionHandler;
+import com.example.gestionstationskii.controllers.RegistrationRestController;
 import com.example.gestionstationskii.entities.Registration;
 import com.example.gestionstationskii.entities.Support;
-import com.example.gestionstationskii.services.BusinessException;
-import com.example.gestionstationskii.services.IRegistrationServices;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
-class RegistrationRestControllerTest {
+class RegistrationRestControllerMockTest {
     @Mock private IRegistrationServices service;
     private MockMvc mvc;
 

@@ -1,10 +1,12 @@
-package com.example.gestionstationskii.integration;
+package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.MySQLContainer;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -13,17 +15,26 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Collections;
 
 @SpringBootTest
-@TestPropertySource(properties = {
-        "server.servlet.context-path=",
-        "spring.datasource.url=jdbc:h2:mem:registration-integration;DB_CLOSE_DELAY=-1;MODE=MySQL",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
-})
 abstract class RegistrationIntegrationSupport {
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.33")
+            .withDatabaseName("station_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    static {
+        MYSQL.start();
+    }
+
+    @DynamicPropertySource
+    static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("server.servlet.context-path", () -> "");
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
+    }
+
     @Autowired protected IRegistrationRepository registrations;
     @Autowired protected ISkierRepository skiers;
     @Autowired protected ICourseRepository courses;

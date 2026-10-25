@@ -17,6 +17,7 @@ pipeline {
         BACKEND_DIR        = 'backend'
         TERRAFORM_DIR      = 'terraform'
         TF_IN_AUTOMATION   = 'true'
+        TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
 
         // URL de la base de tests (pas un secret). Utilisateur et mot de passe :
         // credential Jenkins 'mysql-test', injecte dans le stage UNIT TESTS.

@@ -59,6 +59,19 @@ resource "aws_eks_cluster" "my_cluster" {
   }
 }
 
+# --- Launch template des noeuds : limite de saut IMDS a 2 ---
+# Sans cela, les pods (driver EBS CSI) ne peuvent pas lire les credentials
+# du role de l'instance (erreur "no EC2 IMDS role found").
+resource "aws_launch_template" "nodes" {
+  name_prefix = "${var.cluster_name}-"
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+}
+
 # --- Groupe de noeuds ---
 resource "aws_eks_node_group" "my_node_group" {
   cluster_name    = aws_eks_cluster.my_cluster.name
@@ -66,6 +79,11 @@ resource "aws_eks_node_group" "my_node_group" {
   node_role_arn   = data.aws_iam_role.lab.arn
   subnet_ids      = local.subnet_ids
   instance_types  = [var.node_instance_type]
+
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = aws_launch_template.nodes.latest_version
+  }
 
   scaling_config {
     desired_size = var.node_desired_size
@@ -93,4 +111,8 @@ resource "aws_eks_addon" "ebs_csi" {
   resolve_conflicts_on_update = "OVERWRITE"
 
   depends_on = [aws_eks_node_group.my_node_group]
+
+  timeouts {
+    create = "10m"
+  }
 }

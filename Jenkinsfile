@@ -17,6 +17,7 @@ pipeline {
         BACKEND_DIR        = 'backend'
         TERRAFORM_DIR      = 'terraform'
         TF_IN_AUTOMATION   = 'true'
+        AWS_DEFAULT_REGION = 'us-east-1'
         TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
 
         // URL de la base de tests (pas un secret). Utilisateur et mot de passe :
@@ -161,6 +162,23 @@ EOF
                     // init et validate ne demandent pas de credentials AWS
                     sh 'terraform init -input=false'
                     sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('TERRAFORM PLAN') {
+            steps {
+                // Identifiants temporaires AWS Academy (AWS Details > AWS CLI > Show).
+                // A mettre a jour dans Jenkins a chaque nouvelle session du Lab.
+                withCredentials([
+                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'aws-session-token',     variable: 'AWS_SESSION_TOKEN')
+                ]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh 'terraform init -input=false'
+                        sh 'terraform plan -input=false'
+                    }
                 }
             }
         }

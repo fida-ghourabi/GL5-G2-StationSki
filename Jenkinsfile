@@ -180,9 +180,9 @@ EOF
                 // Identifiants temporaires AWS Academy (AWS Details > AWS CLI > Show).
                 // A mettre a jour dans Jenkins a chaque nouvelle session du Lab.
                 withCredentials([
-                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'aws-session-token',     variable: 'AWS_SESSION_TOKEN')
+                    string(credentialsId: 'aws-access-key',   variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-key',   variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'aws-session-token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh 'mkdir -p "$TF_PLUGIN_CACHE_DIR"'

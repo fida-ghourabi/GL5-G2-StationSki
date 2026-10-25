@@ -17,6 +17,8 @@ pipeline {
         BACKEND_DIR        = 'backend'
         TERRAFORM_DIR      = 'terraform'
         TF_IN_AUTOMATION   = 'true'
+        // Cache des providers : evite de retelecharger le provider AWS a chaque build
+        TF_PLUGIN_CACHE_DIR = '/var/jenkins_home/.terraform.d/plugin-cache'
         AWS_DEFAULT_REGION = 'us-east-1'
         TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
 
@@ -160,7 +162,10 @@ EOF
                     }
 
                     // init et validate ne demandent pas de credentials AWS
-                    sh 'terraform init -input=false'
+                    sh 'mkdir -p "$TF_PLUGIN_CACHE_DIR"'
+                    retry(3) {
+                        sh 'terraform init -input=false'
+                    }
                     sh 'terraform validate'
                 }
             }
@@ -176,7 +181,10 @@ EOF
                     string(credentialsId: 'aws-session-token',     variable: 'AWS_SESSION_TOKEN')
                 ]) {
                     dir("${TERRAFORM_DIR}") {
-                        sh 'terraform init -input=false'
+                        sh 'mkdir -p "$TF_PLUGIN_CACHE_DIR"'
+                        retry(3) {
+                            sh 'terraform init -input=false'
+                        }
                         sh 'terraform plan -input=false'
                     }
                 }

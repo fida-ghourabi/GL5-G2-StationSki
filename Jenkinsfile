@@ -3,7 +3,7 @@ pipeline {
 
     options {
         timestamps()
-        timeout(time: 60, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
     }
@@ -136,6 +136,25 @@ pipeline {
             }
         }
 
+        stage('Vérification connexion AWS') {
+            when { expression { params.PLAN_TERRAFORM || params.APPLY_TERRAFORM || params.DEPLOY_TO_EKS } }
+            steps {
+                withCredentials([
+                    string(credentialsId: env.AWS_ACCESS_KEY_ID_CREDENTIALS, variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: env.AWS_SECRET_ACCESS_KEY_CREDENTIALS, variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: env.AWS_SESSION_TOKEN_CREDENTIALS, variable: 'AWS_SESSION_TOKEN')
+                ]) {
+                    withEnv(["AWS_REGION=${params.AWS_REGION}", "AWS_DEFAULT_REGION=${params.AWS_REGION}"]) {
+                        sh '''
+                            set +x
+                            echo 'Vérification de la connexion AWS et de l’identité utilisée par Jenkins...'
+                            aws sts get-caller-identity --output table
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Terraform : plan et provisionnement') {
             when { expression { params.PLAN_TERRAFORM || params.APPLY_TERRAFORM || params.DEPLOY_TO_EKS } }
             steps {
@@ -160,7 +179,6 @@ pipeline {
                         dir('infrastructure/terraform') {
                             sh '''
                                 set +x
-                                aws sts get-caller-identity
                                 terraform init -input=false
                                 terraform fmt -check -recursive
                                 terraform validate

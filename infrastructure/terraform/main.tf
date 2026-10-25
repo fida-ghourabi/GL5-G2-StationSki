@@ -1,5 +1,10 @@
+data "aws_caller_identity" "current" {}
+
 locals {
   name = var.cluster_name
+  # AWS Academy Learner Lab : les roles IAM ne peuvent pas etre crees, on reutilise LabRole.
+  lab_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
+  lab_session_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/voclabs"
   azs  = slice(data.aws_availability_zones.available.names, 0, 2)
 }
 
@@ -47,11 +52,31 @@ module "eks" {
   cluster_endpoint_private_access      = true
   cluster_endpoint_public_access_cidrs = [var.cluster_endpoint_cidr]
 
-  enable_cluster_creator_admin_permissions = true
+  # Learner Lab : pas de creation de role IAM ni de fournisseur OIDC
+  create_iam_role = false
+  iam_role_arn    = local.lab_role_arn
+  enable_irsa     = false
+
+  # iam:GetRole est refuse sur voclabs : on desactive le droit admin automatique du createur
+  enable_cluster_creator_admin_permissions = false
+  authentication_mode                      = "API_AND_CONFIG_MAP"
+  access_entries = {
+    lab = {
+      principal_arn = local.lab_session_arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
 
   eks_managed_node_groups = {
     application = {
-      name           = "${local.name}-application"
+      name            = "${local.name}-application"
+      create_iam_role = false
+      iam_role_arn    = local.lab_role_arn
       instance_types = ["t3.medium"]
       ami_type       = "AL2023_x86_64_STANDARD"
       subnet_ids     = module.vpc.private_subnets

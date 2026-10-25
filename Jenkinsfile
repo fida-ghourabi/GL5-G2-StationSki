@@ -144,8 +144,12 @@ EOF
             steps {
                 script {
                     docker.withRegistry('', registryCredential) {
-                        dockerImage.push()          // ex. 0.0.2-1
-                        dockerImage.push('latest')
+                        retry(3) {
+                            dockerImage.push()          // ex. 0.0.2-5
+                        }
+                        retry(3) {
+                            dockerImage.push('latest')
+                        }
                     }
                 }
             }

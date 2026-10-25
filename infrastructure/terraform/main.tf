@@ -5,7 +5,7 @@ locals {
   # AWS Academy Learner Lab : les roles IAM ne peuvent pas etre crees, on reutilise LabRole.
   lab_role_arn    = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
   lab_session_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/voclabs"
-  azs  = slice(data.aws_availability_zones.available.names, 0, 2)
+  azs             = slice(data.aws_availability_zones.available.names, 0, 2)
 }
 
 module "vpc" {
@@ -77,13 +77,13 @@ module "eks" {
       name            = "${local.name}-application"
       create_iam_role = false
       iam_role_arn    = local.lab_role_arn
-      instance_types = ["t3.medium"]
-      ami_type       = "AL2023_x86_64_STANDARD"
-      subnet_ids     = module.vpc.private_subnets
-      min_size       = 1
-      max_size       = 2
-      desired_size   = 1
-      capacity_type  = "ON_DEMAND"
+      instance_types  = ["t3.medium"]
+      ami_type        = "AL2023_x86_64_STANDARD"
+      subnet_ids      = module.vpc.private_subnets
+      min_size        = 1
+      max_size        = 2
+      desired_size    = 1
+      capacity_type   = "ON_DEMAND"
     }
   }
 }

@@ -7,7 +7,6 @@ import com.example.gestionstationskii.entities.Registration;
 import com.example.gestionstationskii.entities.Skier;
 import com.example.gestionstationskii.entities.SlotStatus;
 import com.example.gestionstationskii.entities.Support;
-import com.example.gestionstationskii.entities.TypeCourse;
 import com.example.gestionstationskii.services.BusinessException;
 import com.example.gestionstationskii.services.IRegistrationServices;
 import org.junit.jupiter.api.Test;
@@ -51,23 +50,4 @@ class RegistrationServiceIntegrationTest extends RegistrationIntegrationSupport 
         assertEquals(SlotStatus.OPEN, slots.findById(sameWeek.getId()).orElseThrow(AssertionError::new).getStatus());
     }
 
-    @Test
-    void persistedAgeRulesRejectChildrenFromAdultCoursesAndAllowThemOnChildrenCourses() {
-        Course adultCourse = createCourse(TypeCourse.COLLECTIVE_ADULT);
-        Course childrenCourse = createCourse(TypeCourse.COLLECTIVE_CHILDREN);
-        Instructor adultInstructor = createInstructor(adultCourse);
-        Instructor childrenInstructor = createInstructor(childrenCourse);
-        LocalDateTime start = LocalDate.now().plusDays(7)
-                .with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY)).atTime(10, 0);
-        PlanningSlot adultSlot = createSlotAt(adultCourse, adultInstructor, start, 2);
-        PlanningSlot childrenSlot = createSlotAt(childrenCourse, childrenInstructor, start.plusHours(2), 2);
-        Skier child = new Skier();
-        child.setDateOfBirth(start.toLocalDate().minusYears(15));
-        child = skiers.saveAndFlush(child);
-        Long childId = child.getNumSkier();
-
-        Long adultSlotId = adultSlot.getId();
-        assertThrows(BusinessException.class, () -> registrationServices.registerSlot(childId, adultSlotId));
-        assertNotNull(registrationServices.registerSlot(childId, childrenSlot.getId()));
-    }
 }

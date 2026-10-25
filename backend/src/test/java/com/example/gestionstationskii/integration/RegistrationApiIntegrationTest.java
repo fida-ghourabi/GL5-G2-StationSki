@@ -53,7 +53,7 @@ class RegistrationApiIntegrationTest extends RegistrationIntegrationSupport {
     }
 
     @Test
-    void registrationReturnsNotFoundWhenSkierOrSlotDoesNotExist() throws Exception {
+    void unknownResourcesReturnNotFoundJson() throws Exception {
         Course course = createCourse();
         Instructor instructor = createInstructor(course);
         Skier skier = createAdultSkier();
@@ -66,10 +66,6 @@ class RegistrationApiIntegrationTest extends RegistrationIntegrationSupport {
         mvc.perform(post("/registration/skier/{skierId}/slot/{slotId}", skier.getNumSkier(), Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
-    }
-
-    @Test
-    void deletingUnknownRegistrationReturnsNotFound() throws Exception {
         mvc.perform(delete("/registration/{id}", Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));

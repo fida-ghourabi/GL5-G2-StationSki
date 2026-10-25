@@ -8,6 +8,8 @@ import com.example.gestionstationskii.repositories.*;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import javax.persistence.EntityManager;
 import java.time.Period;
 import java.util.List;
@@ -31,6 +33,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
 
     @Override
     public Registration addRegistrationAndAssignToSkier(Registration registration, Long numSkier) {
+        log.debug("Adding registration for skier {}", numSkier);
         Checks.require(registration.getNumRegistration() == null, "Identifiant généré à la création");
         Checks.require(registration.getPlanningSlot() != null, "Créneau requis ; utiliser /registration/skier/{id}/slot/{id}");
         return registerSlot(numSkier, registration.getPlanningSlot().getId());
@@ -38,6 +41,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
 
     @Override
     public Registration assignRegistrationToCourse(Long numRegistration, Long numCourse) {
+        log.debug("Assigning registration {} to course {}", numRegistration, numCourse);
         Checks.id(numRegistration); Checks.id(numCourse);
         Registration registration = registrationRepository.findById(numRegistration).orElseThrow(() -> BusinessException.missing("Inscription"));
         if (!courseRepository.existsById(numCourse)) throw BusinessException.missing(COURSE_RESOURCE);
@@ -48,6 +52,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
 
     @Override
     public Registration addRegistrationAndAssignToSkierAndCourse(Registration registration, Long numSkieur, Long numCours) {
+        log.debug("Adding registration for skier {} and course {}", numSkieur, numCours);
         Checks.id(numCours);
         if (!courseRepository.existsById(numCours)) throw BusinessException.missing(COURSE_RESOURCE);
         Checks.require(registration.getNumRegistration() == null, "Identifiant généré à la création");
@@ -61,6 +66,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Integer> numWeeksCourseOfInstructorBySupport(Long numInstructor, Support support) {
+        log.debug("Finding course weeks for instructor {} and support {}", numInstructor, support);
         Checks.id(numInstructor); Checks.require(support != null, "Support requis");
         if (!instructorRepository.existsById(numInstructor)) throw BusinessException.missing(INSTRUCTOR_RESOURCE);
         return registrationRepository.numWeeksCourseOfInstructorBySupport(numInstructor, support);
@@ -69,6 +75,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public PlanningSlot nextAvailableSlot(Long courseId) {
+        log.debug("Finding next available slot for course {}", courseId);
         return slotRepository.findAll().stream().filter(s -> s.getCourse().getNumCourse().equals(courseId)
                 && s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(java.time.LocalDateTime.now()))
                 .min(java.util.Comparator.comparing(PlanningSlot::getStartTime))
@@ -77,7 +84,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
 
     @Override
     public Registration registerSlot(Long skierId, Long slotId) {
-        log.debug("Processing registration request for slot {}", slotId);
+        log.debug("Processing registration request: skier {} on slot {}", skierId, slotId);
         Checks.id(skierId); Checks.id(slotId);
         // Serialize per skier (schedule conflicts), then per slot (capacity).
         Skier skier = skierRepository.lockById(skierId).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
@@ -94,7 +101,13 @@ public class RegistrationServicesImpl implements IRegistrationServices {
         r.setSkier(skier); r.setCourse(course); r.setPlanningSlot(slot);
         r.setNumWeek(slot.getStartTime().get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR));
         if (count + 1 >= slot.getMaxCapacity()) slot.setStatus(SlotStatus.FULL);
-        Registration saved = registrationRepository.save(r);
+        Registration saved;
+        try {
+            saved = registrationRepository.save(r);
+        } catch (DataIntegrityViolationException | ConcurrencyFailureException ex) {
+            log.error("Technical failure while saving registration for skier {} on slot {}", skierId, slotId, ex);
+            throw ex;
+        }
         log.info("Registration {} created for slot {}", saved.getNumRegistration(), slotId);
         return saved;
     }
@@ -178,12 +191,14 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Registration> bySkier(Long id) {
+        log.debug("Finding registrations for skier {}", id);
         Checks.id(id); if (!skierRepository.existsById(id)) throw BusinessException.missing(SKIER_RESOURCE);
         return registrationRepository.findBySkierNumSkier(id);
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Registration> search(java.time.LocalDateTime from, java.time.LocalDateTime to, Long courseId) {
+        log.debug("Searching registrations from {} to {} for course {}", from, to, courseId);
         Checks.require(from != null && to != null && from.isBefore(to), "Période invalide");
         if (courseId != null) { Checks.id(courseId); if (!courseRepository.existsById(courseId)) throw BusinessException.missing(COURSE_RESOURCE); }
         return registrationRepository.findAll().stream().filter(r -> r.getPlanningSlot() != null

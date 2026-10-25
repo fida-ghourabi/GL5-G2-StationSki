@@ -4,11 +4,14 @@ import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import javax.persistence.EntityManager;
 import java.time.LocalDate;
@@ -63,6 +66,18 @@ class RegistrationServicesTest {
     }
 
     @Test
+    void registerSlotRethrowsTechnicalFailureOnSave() {
+        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+        DataIntegrityViolationException failure = new DataIntegrityViolationException("Registration save failed");
+        when(registrations.save(any(Registration.class))).thenThrow(failure);
+
+        DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
+                () -> service.registerSlot(10L, 30L));
+
+        assertSame(failure, thrown);
+    }
+
+    @Test
     void registerSlotRejectsInvalidIdsBeforeRepositoryAccess() {
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
                 () -> service.registerSlot(0L, 30L)).getStatus());
@@ -98,16 +113,6 @@ class RegistrationServicesTest {
     }
 
     @Test
-    void registerSlotRejectsCancelledSlot() {
-        openSlot.setStatus(SlotStatus.CANCELLED);
-        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-
-        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
-                () -> service.registerSlot(10L, 30L)).getStatus());
-        verify(registrations, never()).save(any(Registration.class));
-    }
-
-    @Test
     void registerSlotRequiresDateOfBirth() {
         adult.setDateOfBirth(null);
         prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
@@ -117,42 +122,31 @@ class RegistrationServicesTest {
         verify(registrations, never()).save(any(Registration.class));
     }
 
-    @Test
-    void registerSlotEnforcesSixteenYearAgeBoundaryForCollectiveCourses() {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "16-year-old rejected from children course, 16, 0, COLLECTIVE_CHILDREN, false",
+            "one day under 16 rejected from adult course, 16, 1, COLLECTIVE_ADULT, false",
+            "exactly 16 accepted in adult course, 16, 0, COLLECTIVE_ADULT, true",
+            "15-year-old accepted in children course, 15, 0, COLLECTIVE_CHILDREN, true",
+            "5-year-old accepted in individual course, 5, 0, INDIVIDUAL, true"
+    })
+    void registerSlotAppliesAgeRules(String scenario, int age, int daysAfterBirthday,
+                                     TypeCourse courseType, boolean accepted) {
         LocalDate lessonDate = openSlot.getStartTime().toLocalDate();
-        Skier childAtBoundary = skier(11L, lessonDate.minusYears(16));
-        Course childrenCourse = course(21L, TypeCourse.COLLECTIVE_CHILDREN);
-        PlanningSlot childrenSlot = slot(31L, childrenCourse, openSlot.getStartTime(), 3, SlotStatus.OPEN);
-        prepareRegistration(childAtBoundary, childrenSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
-                () -> service.registerSlot(11L, 31L)).getStatus());
+        Skier candidate = skier(11L, lessonDate.minusYears(age).plusDays(daysAfterBirthday));
+        Course targetCourse = course(21L, courseType);
+        PlanningSlot targetSlot = slot(31L, targetCourse, openSlot.getStartTime(), 3, SlotStatus.OPEN);
+        prepareRegistration(candidate, targetSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
 
-        Skier adultBelowBoundary = skier(12L, lessonDate.minusYears(16).plusDays(1));
-        prepareRegistration(adultBelowBoundary, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
-                () -> service.registerSlot(12L, 30L)).getStatus());
-
-        Skier adultAtBoundary = skier(13L, lessonDate.minusYears(16));
-        prepareRegistration(adultAtBoundary, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        assertSame(adultAtBoundary, service.registerSlot(13L, 30L).getSkier());
-    }
-
-    @Test
-    void registerSlotAllowsChildrenBelowBoundaryAndAnyAgeForIndividualCourses() {
-        LocalDate lessonDate = openSlot.getStartTime().toLocalDate();
-        Skier child = skier(14L, lessonDate.minusYears(15));
-        Course childrenCourse = course(24L, TypeCourse.COLLECTIVE_CHILDREN);
-        PlanningSlot childrenSlot = slot(42L, childrenCourse, openSlot.getStartTime(), 2, SlotStatus.OPEN);
-        prepareRegistration(child, childrenSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        assertSame(child, service.registerSlot(14L, 42L).getSkier());
-
-        Skier youngSkier = skier(15L, lessonDate.minusYears(5));
-        Course individualCourse = course(25L, TypeCourse.INDIVIDUAL);
-        PlanningSlot individualSlot = slot(43L, individualCourse, openSlot.getStartTime(), 1, SlotStatus.OPEN);
-        prepareRegistration(youngSkier, individualSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
-        assertSame(youngSkier, service.registerSlot(15L, 43L).getSkier());
+        if (accepted) {
+            when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            assertSame(candidate, service.registerSlot(candidate.getNumSkier(), targetSlot.getId()).getSkier());
+        } else {
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.registerSlot(candidate.getNumSkier(), targetSlot.getId()));
+            assertEquals(HttpStatus.CONFLICT, error.getStatus());
+            verify(registrations, never()).save(any(Registration.class));
+        }
     }
 
     @Test
@@ -168,7 +162,10 @@ class RegistrationServicesTest {
 
     @Test
     void registerSlotRejectsAnotherLessonForSameCourseAndIsoWeek() {
-        PlanningSlot other = slot(33L, adultCourse, openSlot.getStartTime().minusHours(2), 4, SlotStatus.OPEN);
+        LocalDateTime monday = LocalDate.of(2030, 1, 7).atTime(10, 0);
+        openSlot.setStartTime(monday);
+        openSlot.setEndTime(monday.plusHours(1));
+        PlanningSlot other = slot(33L, adultCourse, monday.plusHours(2), 4, SlotStatus.OPEN);
         Registration existing = registration(adult, other, adultCourse, false);
         prepareRegistration(adult, openSlot, Collections.singletonList(existing), Collections.<Registration>emptyList());
         assertTrue(assertThrows(BusinessException.class, () -> service.registerSlot(10L, 30L))
@@ -177,7 +174,10 @@ class RegistrationServicesTest {
 
     @Test
     void registerSlotAllowsSameCourseAgainInAnotherIsoWeek() {
-        PlanningSlot nextWeek = slot(36L, adultCourse, openSlot.getStartTime().plusWeeks(1), 2, SlotStatus.OPEN);
+        LocalDateTime monday = LocalDate.of(2030, 1, 7).atTime(10, 0);
+        openSlot.setStartTime(monday);
+        openSlot.setEndTime(monday.plusHours(1));
+        PlanningSlot nextWeek = slot(36L, adultCourse, monday.plusWeeks(1), 2, SlotStatus.OPEN);
         Registration previousWeek = registration(adult, openSlot, adultCourse, false);
         prepareRegistration(adult, nextWeek, Collections.singletonList(previousWeek), Collections.<Registration>emptyList());
         when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));

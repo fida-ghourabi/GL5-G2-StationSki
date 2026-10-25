@@ -17,6 +17,10 @@ pipeline {
         BACKEND_DIR        = 'backend'
         TERRAFORM_DIR      = 'terraform'
         TF_IN_AUTOMATION   = 'true'
+
+        // URL de la base de tests (pas un secret). Utilisateur et mot de passe :
+        // credential Jenkins 'mysql-test', injecte dans le stage UNIT TESTS.
+        TEST_DB_URL        = 'jdbc:mysql://mysql:3306/station_test?createDatabaseIfNotExist=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8'
     }
 
     options {
@@ -52,8 +56,13 @@ pipeline {
         stage('UNIT TESTS') {
             steps {
                 echo 'Launching Unit Tests (JUnit + Mockito + JaCoCo)...'
-                dir("${BACKEND_DIR}") {
-                    sh 'mvn -B test'
+                withCredentials([usernamePassword(
+                        credentialsId: 'mysql-test',
+                        usernameVariable: 'TEST_DB_USERNAME',
+                        passwordVariable: 'TEST_DB_PASSWORD')]) {
+                    dir("${BACKEND_DIR}") {
+                        sh 'mvn -B test'
+                    }
                 }
             }
             post {
@@ -155,9 +164,31 @@ EOF
             }
         }
 
-        // ---- Etapes a ajouter plus tard ----
-        // TERRAFORM PLAN/APPLY
-        // KUBERNETES
+        // ---- A activer quand le cluster EKS existe ----
+        // Cree le secret MySQL dans le cluster a partir des credentials Jenkins
+        // (rien n'est ecrit dans le code, ni dans l'etat Terraform).
+        //
+        // stage('KUBERNETES') {
+        //     steps {
+        //         withCredentials([
+        //             file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG'),
+        //             usernamePassword(credentialsId: 'mysql-app',
+        //                              usernameVariable: 'DB_USER',
+        //                              passwordVariable: 'DB_PASS'),
+        //             string(credentialsId: 'mysql-root-password', variable: 'DB_ROOT_PASS')
+        //         ]) {
+        //             sh '''
+        //                 kubectl create namespace station-ski --dry-run=client -o yaml | kubectl apply -f -
+        //                 kubectl -n station-ski create secret generic mysql-credentials \
+        //                   --from-literal=MYSQL_USER="$DB_USER" \
+        //                   --from-literal=MYSQL_PASSWORD="$DB_PASS" \
+        //                   --from-literal=MYSQL_ROOT_PASSWORD="$DB_ROOT_PASS" \
+        //                   --from-literal=MYSQL_DATABASE=skidb \
+        //                   --dry-run=client -o yaml | kubectl apply -f -
+        //             '''
+        //         }
+        //     }
+        // }
     }
 
     post {

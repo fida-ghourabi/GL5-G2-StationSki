@@ -10,7 +10,7 @@
 </parent>
 <groupId>com.example</groupId>
 <artifactId>gestion-station-skii</artifactId>
-<version>0.0.1-SNAPSHOT</version>
+<version>0.0.2-SNAPSHOT</version>
 <name>gestion-station-skii</name>
 <description>gestion-station-skii</description>
 <properties>

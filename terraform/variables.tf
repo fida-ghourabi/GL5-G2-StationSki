@@ -19,7 +19,7 @@ variable "role_name" {
 variable "kubernetes_version" {
   description = "Version Kubernetes (verifier qu'elle est en support STANDARD)"
   type        = string
-  default     = "1.33"
+  default     = "1.34"
 }
 
 variable "subnet_ids" {

@@ -27,8 +27,8 @@ class BusinessRulesTest {
         PlanningSlot slot = new PlanningSlot(); slot.setId(2L); slot.setCourse(course); slot.setStatus(SlotStatus.OPEN); slot.setMaxCapacity(6);
         slot.setStartTime(LocalDateTime.now().plusDays(1)); slot.setEndTime(slot.getStartTime().plusHours(1));
         when(skiers.lockById(1L)).thenReturn(Optional.of(skier)); when(slots.lockById(2L)).thenReturn(Optional.of(slot));
-        when(registrations.findBySkier_NumSkier(1L)).thenReturn(Collections.emptyList());
-        when(registrations.findByPlanningSlot_Id(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
+        when(registrations.findBySkierNumSkier(1L)).thenReturn(Collections.emptyList());
+        when(registrations.findByPlanningSlotId(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class, () -> service.registerSlot(1L, 2L)).getStatus());
         verify(registrations, never()).save(any(Registration.class));
     }

@@ -10,6 +10,16 @@ import java.time.*;
 public final class Requests {
     private Requests() { }
     @Getter @Setter
+    public static class RegistrationInput {
+        private Long numRegistration;
+        private int numWeek;
+        private PlanningSlotReference planningSlot;
+    }
+    @Getter @Setter
+    public static class PlanningSlotReference {
+        private Long id;
+    }
+    @Getter @Setter
     public static class Availability {
         private DayOfWeek dayOfWeek;
         private LocalTime startTime;

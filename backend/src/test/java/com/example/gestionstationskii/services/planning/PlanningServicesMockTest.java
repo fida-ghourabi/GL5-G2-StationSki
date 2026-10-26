@@ -130,10 +130,11 @@ void addAvailabilityRejectsInvalidTimeRange() {
     @Test
     void updateRejectsSlotWithRegistrationHistory() {
         PlanningSlot current = slot(8L, LocalDateTime.now().plusDays(2));
+        Requests.Slot update = slotInput(1L, 2L, 6);
         when(slots.lockById(8L)).thenReturn(Optional.of(current));
         when(registrations.findByPlanningSlot_Id(8L)).thenReturn(Collections.singletonList(new Registration()));
 
-        assertThrows(BusinessException.class, () -> service.update(8L, slotInput(1L, 2L, 6)));
+        assertThrows(BusinessException.class, () -> service.update(8L, update));
 
         verify(slots, never()).save(any(PlanningSlot.class));
     }
@@ -145,9 +146,11 @@ void addAvailabilityRejectsInvalidTimeRange() {
         PlanningSlot started = slot(9L, LocalDateTime.now().minusHours(1));
         when(slots.lockById(8L)).thenReturn(Optional.of(cancelled));
         when(slots.lockById(9L)).thenReturn(Optional.of(started));
+        Requests.Slot updateCancelled = slotInput(1L, 2L, 6);
+        Requests.Slot updateStarted = slotInput(1L, 2L, 6);
 
-        assertThrows(BusinessException.class, () -> service.update(8L, slotInput(1L, 2L, 6)));
-        assertThrows(BusinessException.class, () -> service.update(9L, slotInput(1L, 2L, 6)));
+        assertThrows(BusinessException.class, () -> service.update(8L, updateCancelled));
+        assertThrows(BusinessException.class, () -> service.update(9L, updateStarted));
         verify(slots, never()).save(any(PlanningSlot.class));
     }
 

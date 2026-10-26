@@ -95,8 +95,9 @@ class PlanningServicesIntegrationTest {
         Requests.Availability input = availabilityInput();
         input.setStartTime(LocalTime.of(12, 0));
         input.setEndTime(LocalTime.of(9, 0));
+        Long instructorId = fixture.instructor.getNumInstructor();
 
-        assertThrows(BusinessException.class, () -> service.addAvailability(fixture.instructor.getNumInstructor(), input));
+        assertThrows(BusinessException.class, () -> service.addAvailability(instructorId, input));
 
         assertEquals(0, availabilities.count());
     }
@@ -137,8 +138,9 @@ class PlanningServicesIntegrationTest {
     @Test
     void createRejectsCapacityAboveCollectiveLimit() {
         Fixture fixture = createFixture();
+        Requests.Slot input = slotInput(fixture, 10, 7);
 
-        assertThrows(BusinessException.class, () -> service.create(slotInput(fixture, 10, 7)));
+        assertThrows(BusinessException.class, () -> service.create(input));
 
         assertEquals(0, slots.count());
     }
@@ -147,8 +149,9 @@ class PlanningServicesIntegrationTest {
     @Test
     void createRejectsInstructorNotAssignedToCourse() {
         Fixture fixture = createFixture(TypeCourse.COLLECTIVE_ADULT, false, true);
+        Requests.Slot input = slotInput(fixture, 10, 6);
 
-        assertThrows(BusinessException.class, () -> service.create(slotInput(fixture, 10, 6)));
+        assertThrows(BusinessException.class, () -> service.create(input));
 
         assertEquals(0, slots.count());
     }
@@ -162,8 +165,10 @@ class PlanningServicesIntegrationTest {
         registration.setCourse(fixture.course);
         registration.setPlanningSlot(slot);
         registrations.saveAndFlush(registration);
+        Long slotId = slot.getId();
+        Requests.Slot update = slotInput(fixture, 11, 5);
 
-        assertThrows(BusinessException.class, () -> service.update(slot.getId(), slotInput(fixture, 11, 5)));
+        assertThrows(BusinessException.class, () -> service.update(slotId, update));
 
         assertEquals(LocalTime.of(10, 0), slots.findById(slot.getId()).get().getStartTime().toLocalTime());
     }
@@ -183,9 +188,11 @@ class PlanningServicesIntegrationTest {
         started.setStatus(SlotStatus.OPEN);
         started = slots.saveAndFlush(started);
         Long startedId = started.getId();
+        Long cancelledId = cancelled.getId();
+        Requests.Slot update = slotInput(fixture, 11, 5);
 
-        assertThrows(BusinessException.class, () -> service.update(cancelled.getId(), slotInput(fixture, 11, 5)));
-        assertThrows(BusinessException.class, () -> service.update(startedId, slotInput(fixture, 11, 5)));
+        assertThrows(BusinessException.class, () -> service.update(cancelledId, update));
+        assertThrows(BusinessException.class, () -> service.update(startedId, update));
     }
 
     /** 10. cancelMarksSlotAndItsRegistrationsAsCancelled */
@@ -303,8 +310,9 @@ class PlanningServicesIntegrationTest {
     @Test
     void individualCourseAcceptsOnlyOnePlace() {
         Fixture fixture = createFixture(TypeCourse.INDIVIDUAL, true, true);
+        Requests.Slot invalidCapacity = slotInput(fixture, 10, 2);
 
-        assertThrows(BusinessException.class, () -> service.create(slotInput(fixture, 10, 2)));
+        assertThrows(BusinessException.class, () -> service.create(invalidCapacity));
         assertNotNull(service.create(slotInput(fixture, 10, 1)).getId());
     }
 

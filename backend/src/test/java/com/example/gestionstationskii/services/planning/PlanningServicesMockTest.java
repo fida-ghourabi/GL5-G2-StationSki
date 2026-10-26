@@ -22,6 +22,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class PlanningServicesMockTest {
@@ -58,14 +59,15 @@ class PlanningServicesMockTest {
     }
 
     @Test
-    void addAvailabilityRejectsInvalidTimeRange() {
-        Requests.Availability input = availabilityInput();
-        input.setStartTime(LocalTime.of(12, 0));
-        input.setEndTime(LocalTime.of(9, 0));
+void addAvailabilityRejectsInvalidTimeRange() {
+    when(instructors.lockById(2L)).thenReturn(Optional.of(instructor(2L)));
+    Requests.Availability input = availabilityInput();
+    input.setStartTime(LocalTime.of(12, 0));
+    input.setEndTime(LocalTime.of(9, 0));
 
-        assertThrows(BusinessException.class, () -> service.addAvailability(2L, input));
-        verify(availabilities, never()).save(any(InstructorAvailability.class));
-    }
+    assertThrows(BusinessException.class, () -> service.addAvailability(2L, input));
+    verify(availabilities, never()).save(any(InstructorAvailability.class));
+}
 
     @Test
     void availabilityRejectsUnknownInstructor() {
@@ -183,14 +185,14 @@ class PlanningServicesMockTest {
     }
 
     private void stubValidCreate(Requests.Slot input) {
-        Course course = course(1L);
-        Instructor instructor = instructor(2L, course);
-        when(courses.lockById(1L)).thenReturn(Optional.of(course));
-        when(instructors.lockById(2L)).thenReturn(Optional.of(instructor));
-        when(instructors.findById(2L)).thenReturn(Optional.of(instructor));
-        when(availabilities.findByInstructor_NumInstructor(2L))
-                .thenReturn(Collections.singletonList(availability(instructor, input.getStartTime().toLocalDate())));
-    }
+    Course course = course(1L);
+    Instructor instructor = instructor(2L, course);
+    when(courses.lockById(1L)).thenReturn(Optional.of(course));
+    when(instructors.lockById(2L)).thenReturn(Optional.of(instructor));
+    when(instructors.existsById(2L)).thenReturn(true);
+    when(availabilities.findByInstructor_NumInstructor(2L))
+            .thenReturn(Collections.singletonList(availability(instructor, input.getStartTime().toLocalDate())));
+}
 
     private static Requests.Availability availabilityInput() {
         Requests.Availability input = new Requests.Availability();

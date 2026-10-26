@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class PlanningServicesImpl implements IPlanningServices {
+    private static final String INSTRUCTOR_RESOURCE = "Moniteur";
+    private static final String SLOT_RESOURCE = "Créneau";
     private final PlanningSlotRepository slots;
     private final InstructorAvailabilityRepository availabilities;
     private final IInstructorRepository instructors;
@@ -24,7 +26,7 @@ public class PlanningServicesImpl implements IPlanningServices {
     @Override
     public InstructorAvailability addAvailability(Long instructorId, Requests.Availability input) {
         Checks.id(instructorId);
-        Instructor instructor = instructors.lockById(instructorId).orElseThrow(() -> BusinessException.missing("Moniteur"));
+        Instructor instructor = instructors.lockById(instructorId).orElseThrow(() -> BusinessException.missing(INSTRUCTOR_RESOURCE));
         Checks.require(input.getDayOfWeek() != null && input.getStartTime() != null && input.getEndTime() != null
                 && input.getStartTime().isBefore(input.getEndTime()), "Jour et heures valides requis (sans passage à minuit)");
         Checks.require(input.getValidFrom() != null && input.getValidUntil() != null && !input.getValidFrom().isAfter(input.getValidUntil()), "Période de validité invalide");
@@ -36,20 +38,21 @@ public class PlanningServicesImpl implements IPlanningServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<InstructorAvailability> availability(Long id) {
-        Checks.id(id); instructors.findById(id).orElseThrow(() -> BusinessException.missing("Moniteur"));
+        Checks.id(id);
+        if (!instructors.existsById(id)) throw BusinessException.missing(INSTRUCTOR_RESOURCE);
         return availabilities.findByInstructor_NumInstructor(id);
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public PlanningSlot get(Long id) {
-        Checks.id(id); return slots.findById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
+        Checks.id(id); return slots.findById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
     }
     @Override
     public PlanningSlot create(Requests.Slot input) { return save(new PlanningSlot(), input); }
     @Override
     public PlanningSlot update(Long id, Requests.Slot input) {
         Checks.id(id);
-        PlanningSlot current = slots.lockById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
+        PlanningSlot current = slots.lockById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
         if (current.getStatus() == SlotStatus.CANCELLED) throw BusinessException.conflict("Créneau annulé non modifiable");
         if (!current.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non modifiable");
         // Do not silently move a skier's confirmed appointment.
@@ -61,7 +64,7 @@ public class PlanningServicesImpl implements IPlanningServices {
         Checks.require(input.getStartTime() != null && input.getEndTime() != null && input.getStartTime().isBefore(input.getEndTime())
                 && input.getStartTime().isAfter(LocalDateTime.now()) && input.getStartTime().toLocalDate().equals(input.getEndTime().toLocalDate()), "Créneau futur, de durée positive et sur une même journée requis");
         Course course = courses.lockById(input.getCourseId()).orElseThrow(() -> BusinessException.missing("Cours"));
-        Instructor instructor = instructors.lockById(input.getInstructorId()).orElseThrow(() -> BusinessException.missing("Moniteur"));
+        Instructor instructor = instructors.lockById(input.getInstructorId()).orElseThrow(() -> BusinessException.missing(INSTRUCTOR_RESOURCE));
         if (!instructor.getCourses().contains(course)) throw BusinessException.conflict("Ce moniteur n'est pas associé au cours");
         int ceiling = course.getTypeCourse() == TypeCourse.INDIVIDUAL ? 1 : 6;
         Checks.require(input.getMaxCapacity() != null && input.getMaxCapacity() > 0 && input.getMaxCapacity() <= ceiling,
@@ -81,7 +84,7 @@ public class PlanningServicesImpl implements IPlanningServices {
     @Override
     public void cancel(Long id) {
         Checks.id(id);
-        PlanningSlot slot = slots.lockById(id).orElseThrow(() -> BusinessException.missing("Créneau"));
+        PlanningSlot slot = slots.lockById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
         if (!slot.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non annulable");
         slot.setStatus(SlotStatus.CANCELLED);
         registrations.findByPlanningSlot_Id(id).forEach(r -> r.setCancelled(true));
@@ -90,8 +93,14 @@ public class PlanningServicesImpl implements IPlanningServices {
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<PlanningSlot> search(LocalDateTime from, LocalDateTime to, Long courseId, Long instructorId, boolean available) {
         Checks.require(from != null && to != null && from.isBefore(to), "Période de recherche invalide");
-        if (courseId != null) { Checks.id(courseId); courses.findById(courseId).orElseThrow(() -> BusinessException.missing("Cours")); }
-        if (instructorId != null) { Checks.id(instructorId); instructors.findById(instructorId).orElseThrow(() -> BusinessException.missing("Moniteur")); }
+        if (courseId != null) {
+            Checks.id(courseId);
+            if (!courses.existsById(courseId)) throw BusinessException.missing("Cours");
+        }
+        if (instructorId != null) {
+            Checks.id(instructorId);
+            if (!instructors.existsById(instructorId)) throw BusinessException.missing(INSTRUCTOR_RESOURCE);
+        }
         return slots.findAll().stream().filter(s -> TimeRanges.overlaps(s.getStartTime(), s.getEndTime(), from, to)
                 && (courseId == null || s.getCourse().getNumCourse().equals(courseId))
                 && (instructorId == null || s.getInstructor().getNumInstructor().equals(instructorId))

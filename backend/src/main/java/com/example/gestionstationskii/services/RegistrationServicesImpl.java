@@ -95,7 +95,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
         Checks.require(skier.getDateOfBirth() != null, "Date de naissance du skieur requise");
         ensureAgeMatchesCourse(skier, course, slot, slotId);
         ensureNoConflictingRegistration(skierId, course, slot);
-        long count = registrationRepository.findByPlanningSlotId(slotId).stream().filter(r -> !r.isCancelled()).count();
+        long count = registrationRepository.findByPlanningSlot_Id(slotId).stream().filter(r -> !r.isCancelled()).count();
         ensureSlotHasCapacity(slot, slotId, count);
         Registration r = new Registration();
         r.setSkier(skier); r.setCourse(course); r.setPlanningSlot(slot);
@@ -130,7 +130,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     }
 
     private void ensureNoConflictingRegistration(Long skierId, Course course, PlanningSlot slot) {
-        for (Registration r : registrationRepository.findBySkierNumSkier(skierId)) {
+        for (Registration r : registrationRepository.findBySkier_NumSkier(skierId)) {
             if (r.isCancelled()) continue;
             PlanningSlot other = r.getPlanningSlot();
             if (hasScheduleOverlap(other, slot))
@@ -172,7 +172,9 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     public void cancel(Long id) {
         Checks.id(id);
         Registration initial = registrationRepository.findById(id).orElseThrow(() -> BusinessException.missing("Inscription"));
-        skierRepository.lockById(initial.getSkier().getNumSkier()).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
+        Skier lockedSkier = skierRepository.lockById(initial.getSkier().getNumSkier())
+                .orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
+        entityManager.refresh(lockedSkier);
         PlanningSlot slot = initial.getPlanningSlot() == null ? null : slotRepository.lockById(initial.getPlanningSlot().getId()).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
         entityManager.refresh(initial);
         if (slot != null) entityManager.refresh(slot);
@@ -193,7 +195,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     public List<Registration> bySkier(Long id) {
         log.debug("Finding registrations for skier {}", id);
         Checks.id(id); if (!skierRepository.existsById(id)) throw BusinessException.missing(SKIER_RESOURCE);
-        return registrationRepository.findBySkierNumSkier(id);
+        return registrationRepository.findBySkier_NumSkier(id);
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)

@@ -69,7 +69,7 @@ class PlanningServicesMockTest {
 
     @Test
     void availabilityRejectsUnknownInstructor() {
-        when(instructors.findById(99L)).thenReturn(Optional.empty());
+        when(instructors.existsById(99L)).thenReturn(false);
 
         assertThrows(BusinessException.class, () -> service.availability(99L));
 
@@ -174,8 +174,8 @@ class PlanningServicesMockTest {
         earlier.setCourse(selectedCourse);
         earlier.setInstructor(selectedInstructor);
         when(slots.findAll()).thenReturn(Arrays.asList(later, earlier));
-        when(courses.findById(1L)).thenReturn(Optional.of(selectedCourse));
-        when(instructors.findById(2L)).thenReturn(Optional.of(selectedInstructor));
+        when(courses.existsById(1L)).thenReturn(true);
+        when(instructors.existsById(2L)).thenReturn(true);
 
         List<PlanningSlot> result = service.search(from, from.plusDays(1), 1L, 2L, false);
 

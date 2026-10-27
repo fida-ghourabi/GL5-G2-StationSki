@@ -257,6 +257,8 @@ EOF
 
                                 kubectl apply -f k8s/storageclass.yaml
                                 kubectl apply -f k8s/mysql.yaml
+                                kubectl -n "$K8S_NAMESPACE" delete deployment mysql --ignore-not-found
+                                kubectl -n "$K8S_NAMESPACE" delete pvc mysql-data --ignore-not-foundc
                                 kubectl -n "$K8S_NAMESPACE" rollout status deployment/mysql --timeout=300s || {
                                     echo "=== DIAGNOSTIC MYSQL ==="
                                     kubectl -n "$K8S_NAMESPACE" get pods,pvc -o wide

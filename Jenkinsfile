@@ -220,6 +220,7 @@ EOF
             steps {
                 script {
                     def frontImage = "${FRONTEND_REGISTRY}:front-${BUILD_NUMBER}"
+                    env.FRONTEND_TAG = "front-${BUILD_NUMBER}"
                     echo "Image : ${frontImage}"
                     retry(3) { sh "docker build -t ${frontImage} frontend" }
                     docker.withRegistry('', registryCredential) {
@@ -360,6 +361,7 @@ EOF
             steps {
                 script {
                     env.DEPLOY_IMAGE = "${registry}:${env.IMAGE_TAG ?: 'latest'}"
+                    env.FRONTEND_DEPLOY_IMAGE = "${FRONTEND_REGISTRY}:${env.FRONTEND_TAG ?: 'latest'}"
                     withAws {
                         sh '''
                             export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
@@ -384,13 +386,14 @@ EOF
 
                             # Application geree par ArgoCD (GitOps) : chemin k8s/app du depot
                             sed -e "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" \
+                                -e "s|FRONTEND_PLACEHOLDER|$FRONTEND_DEPLOY_IMAGE|g" \
                                 -e "s|REVISION_PLACEHOLDER|$GIT_REVISION|g" \
                                 k8s/argocd/application.yaml | kubectl apply -f -
                             kubectl -n argocd annotate application station-ski argocd.argoproj.io/refresh=hard --overwrite
 
                             # Attend qu'ArgoCD ait deploye la bonne image
                             CUR=""
-                            for i in $(seq 1 120); do
+                            for i in $(seq 1 60); do
                                 CUR=$(kubectl -n "$K8S_NAMESPACE" get deploy station-ski \
                                       -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
                                 [ "$CUR" = "$DEPLOY_IMAGE" ] && break

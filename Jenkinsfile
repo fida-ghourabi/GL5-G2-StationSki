@@ -9,6 +9,18 @@ def withAws(Closure body) {
     }
 }
 
+// true si le dossier a change depuis le dernier commit EFFECTIVEMENT construit (image poussee),
+// ou si aucun etat n'est memorise. Independant du resultat global des builds Jenkins.
+def changedSince(String dir, String head) {
+    def last = sh(script: "cat \"\$BUILD_STATE_DIR/${dir}.commit\" 2>/dev/null || true",
+                  returnStdout: true).trim()
+    if (!last) {
+        return true
+    }
+    // code retour 0 = aucun changement ; autre = changement (ou commit memorise introuvable)
+    return sh(script: "git diff --quiet ${last} ${head} -- ${dir}", returnStatus: true) != 0
+}
+
 pipeline {
 
     agent any
@@ -46,6 +58,8 @@ pipeline {
         NODEGROUP_NAME     = 'stationski-nodes'
         K8S_NAMESPACE      = 'station-ski'
         GIT_REVISION       = 'feature/sahar-saidani'
+        // Dernier commit construit (backend/frontend), conserve hors du workspace
+        BUILD_STATE_DIR    = '/var/jenkins_home/build-state'
 
         TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
         TEST_DB_URL        = 'jdbc:mysql://mysql:3306/station_test?createDatabaseIfNotExist=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8'
@@ -70,17 +84,17 @@ pipeline {
             when { expression { env.ACTION != 'destroy' } }
             steps {
                 script {
-                    def base = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
+                    sh 'mkdir -p "$BUILD_STATE_DIR"'
+                    env.HEAD_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     def backend = true
                     def frontend = true
-                    if (!params.FORCE_BUILD && base) {
-                        // code retour 0 = aucun changement ; autre = changement (ou commit de base introuvable)
-                        backend  = sh(script: "git diff --quiet ${base} HEAD -- backend",  returnStatus: true) != 0
-                        frontend = sh(script: "git diff --quiet ${base} HEAD -- frontend", returnStatus: true) != 0
+                    if (!params.FORCE_BUILD) {
+                        backend  = changedSince('backend',  env.HEAD_COMMIT)
+                        frontend = changedSince('frontend', env.HEAD_COMMIT)
                     }
                     env.BACKEND_CHANGED  = backend.toString()
                     env.FRONTEND_CHANGED = frontend.toString()
-                    echo "Backend modifié : ${env.BACKEND_CHANGED} | Frontend modifié : ${env.FRONTEND_CHANGED} | FORCE_BUILD : ${params.FORCE_BUILD}"
+                    echo "Commit : ${env.HEAD_COMMIT} | Backend modifié : ${env.BACKEND_CHANGED} | Frontend modifié : ${env.FRONTEND_CHANGED} | FORCE_BUILD : ${params.FORCE_BUILD}"
                 }
             }
         }
@@ -195,6 +209,8 @@ EOF
                         retry(3) { backendImage.push() }
                         retry(3) { backendImage.push('latest') }
                     }
+                    // Memorise le commit seulement apres un push reussi
+                    sh 'echo "$HEAD_COMMIT" > "$BUILD_STATE_DIR/backend.commit"'
                 }
             }
         }
@@ -211,6 +227,7 @@ EOF
                         sh "docker tag ${frontImage} ${FRONTEND_REGISTRY}:latest"
                         retry(3) { sh "docker push ${FRONTEND_REGISTRY}:latest" }
                     }
+                    sh 'echo "$HEAD_COMMIT" > "$BUILD_STATE_DIR/frontend.commit"'
                 }
             }
         }

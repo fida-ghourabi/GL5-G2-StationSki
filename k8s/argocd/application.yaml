@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: station-ski
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/fida-ghourabi/GL5-G2-StationSki.git
+    targetRevision: REVISION_PLACEHOLDER
+    path: k8s/app
+    kustomize:
+      images:
+        - IMAGE_PLACEHOLDER
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: station-ski
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

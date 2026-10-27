@@ -42,6 +42,7 @@ pipeline {
         AWS_DEFAULT_REGION = 'us-east-1'
         CLUSTER_NAME       = 'stationski'
         K8S_NAMESPACE      = 'station-ski'
+        GIT_REVISION       = 'feature/sahar-saidani'
 
         TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
         TEST_DB_URL        = 'jdbc:mysql://mysql:3306/station_test?createDatabaseIfNotExist=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8'
@@ -268,12 +269,101 @@ EOF
                                     exit 1
                                 }
 
-                                sed "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" k8s/app.yaml | kubectl apply -f -
-                                kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski --timeout=600s
-                                kubectl -n "$K8S_NAMESPACE" get pods,svc
+                                kubectl -n "$K8S_NAMESPACE" get pods,pvc
+                            '''
+                        }
+                    }
+                }
+            }
+        }
 
+        stage('ARGOCD') {
+            when { expression { env.ACTION == 'apply' } }
+            steps {
+                script {
+                    env.DEPLOY_IMAGE = "${registry}:${env.IMAGE_TAG ?: 'latest'}"
+                    withAws {
+                        sh '''
+                            export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
+                            aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" \
+                              --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG"
+
+                            # Installation d'ArgoCD
+                            kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+                            kubectl apply -n argocd --server-side --force-conflicts \
+                              -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+                            kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=120s
+
+                            # Interface web en HTTP sur le NodePort 30081
+                            kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge \
+                              -p '{"data":{"server.insecure":"true"}}'
+                            kubectl -n argocd patch svc argocd-server \
+                              -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30081}]}}'
+                            kubectl -n argocd rollout restart deployment argocd-server
+                            kubectl -n argocd rollout status deployment/argocd-server --timeout=300s
+                            kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=300s
+                            kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
+
+                            # Application geree par ArgoCD (GitOps) : chemin k8s/app du depot
+                            sed -e "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" \
+                                -e "s|REVISION_PLACEHOLDER|$GIT_REVISION|g" \
+                                k8s/argocd/application.yaml | kubectl apply -f -
+                            kubectl -n argocd annotate application station-ski argocd.argoproj.io/refresh=hard --overwrite
+
+                            # Attend qu'ArgoCD ait deploye la bonne image
+                            CUR=""
+                            for i in $(seq 1 120); do
+                                CUR=$(kubectl -n "$K8S_NAMESPACE" get deploy station-ski \
+                                      -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+                                [ "$CUR" = "$DEPLOY_IMAGE" ] && break
+                                sleep 5
+                            done
+                            [ "$CUR" = "$DEPLOY_IMAGE" ] || {
+                                echo "ArgoCD n'a pas synchronise l'image attendue ($DEPLOY_IMAGE)"
+                                kubectl -n argocd get applications
+                                kubectl -n argocd describe application station-ski | tail -40
+                                exit 1
+                            }
+                            kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski --timeout=600s
+                            kubectl -n argocd get applications
+                            kubectl -n "$K8S_NAMESPACE" get pods,svc
+
+                            NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+                            echo "=========================================================="
+                            echo "Application : http://$NODE_IP:30080/stationSki/swagger-ui/index.html"
+                            echo "ArgoCD      : http://$NODE_IP:30081  (utilisateur admin)"
+                            echo "Mot de passe ArgoCD : kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password} | base64 -d"
+                            echo "=========================================================="
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('MONITORING') {
+            when { expression { env.ACTION == 'apply' } }
+            steps {
+                script {
+                    withAws {
+                        withCredentials([string(credentialsId: 'grafana-admin-password', variable: 'GRAFANA_PASS')]) {
+                            sh '''
+                                export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
+                                aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" \
+                                  --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG"
+
+                                helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+                                helm repo update
+                                helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+                                  --namespace monitoring --create-namespace \
+                                  -f k8s/monitoring/values.yaml \
+                                  --set grafana.adminPassword="$GRAFANA_PASS" \
+                                  --wait --timeout 15m
+
+                                kubectl -n monitoring get pods
                                 NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
-                                echo "Application : http://$NODE_IP:30080/stationSki/"
+                                echo "=========================================================="
+                                echo "Grafana : http://$NODE_IP:30300  (utilisateur admin)"
+                                echo "=========================================================="
                             '''
                         }
                     }
@@ -291,6 +381,11 @@ EOF
                             export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
                             aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" \
                               --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG" || true
+                            # ArgoCD d'abord (sinon il recree l'application), puis monitoring et namespaces
+                            kubectl -n argocd delete application station-ski --ignore-not-found --timeout=120s || true
+                            helm uninstall monitoring -n monitoring || true
+                            kubectl delete namespace monitoring --ignore-not-found --timeout=300s || true
+                            kubectl delete namespace argocd --ignore-not-found --timeout=300s || true
                             kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --timeout=300s || true
                         '''
                         dir("${TERRAFORM_DIR}") {

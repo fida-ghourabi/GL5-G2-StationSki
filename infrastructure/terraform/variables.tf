@@ -13,7 +13,7 @@ variable "environment" {
 variable "cluster_name" {
   description = "EKS cluster name."
   type        = string
-  default     = "stationski-dev"
+  default     = "stationski-cluster"
 }
 
 variable "cluster_endpoint_cidr" {

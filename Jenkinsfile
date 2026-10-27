@@ -302,7 +302,7 @@ pipeline {
         booleanParam(name: 'DEPLOY_TO_EKS', defaultValue: false, description: 'Déployer les images sur le cluster EKS.')
         booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: true, description: 'DANGER : supprime VPC, EKS et RDS (données perdues) à la fin du build, après le apply.')
         string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'Région du Learner Lab.')
-        string(name: 'EKS_CLUSTER_NAME', defaultValue: 'stationski-dev', description: 'Nom du cluster Terraform/EKS.')
+        string(name: 'EKS_CLUSTER_NAME', defaultValue: 'stationski-cluster', description: 'Nom du cluster Terraform/EKS.')
         string(name: 'EKS_API_CIDR', defaultValue: '', description: 'CIDR public restreint pour Jenkins vers l’API EKS, par exemple son IP sortante suivie de /32.')
         string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bennasserhajer', description: 'Namespace Docker Hub propriétaire des images.')
         string(name: 'SONAR_URL', defaultValue: 'http://sonarqube:9000', description: 'URL SonarQube joignable depuis Jenkins.')

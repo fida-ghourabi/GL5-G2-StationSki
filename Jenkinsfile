@@ -257,7 +257,16 @@ EOF
 
                                 kubectl apply -f k8s/storageclass.yaml
                                 kubectl apply -f k8s/mysql.yaml
-                                kubectl -n "$K8S_NAMESPACE" rollout status deployment/mysql --timeout=600s
+                                kubectl -n "$K8S_NAMESPACE" rollout status deployment/mysql --timeout=300s || {
+                                    echo "=== DIAGNOSTIC MYSQL ==="
+                                    kubectl -n "$K8S_NAMESPACE" get pods,pvc -o wide
+                                    kubectl -n "$K8S_NAMESPACE" describe pvc mysql-data | tail -25
+                                    kubectl -n "$K8S_NAMESPACE" describe pod -l app=mysql | tail -35
+                                    kubectl -n "$K8S_NAMESPACE" logs -l app=mysql --tail=40 || true
+                                    kubectl -n kube-system get pods | grep -i ebs || true
+                                    kubectl -n kube-system logs -l app=ebs-csi-controller -c csi-provisioner --tail=30 || true
+                                    exit 1
+                                }
 
                                 sed "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" k8s/app.yaml | kubectl apply -f -
                                 kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski --timeout=600s

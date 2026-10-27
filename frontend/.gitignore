@@ -3,3 +3,5 @@ dist/
 .angular/
 out-tsc/
 *.log
+.scannerwork/
+coverage/

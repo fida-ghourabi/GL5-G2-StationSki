@@ -33,6 +33,7 @@ pipeline {
         IMAGE_TAG = 'pending'
         BACKEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-backend"
         FRONTEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-frontend"
+        TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
     }
 
     stages {

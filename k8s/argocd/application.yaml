@@ -12,6 +12,7 @@ spec:
     kustomize:
       images:
         - IMAGE_PLACEHOLDER
+        - FRONTEND_PLACEHOLDER
   destination:
     server: https://kubernetes.default.svc
     namespace: station-ski

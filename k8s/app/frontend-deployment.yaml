@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: station-ski-frontend
+  namespace: station-ski
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: station-ski-frontend
+  template:
+    metadata:
+      labels:
+        app: station-ski-frontend
+    spec:
+      containers:
+        - name: station-ski-frontend
+          image: saharsaidani/gestion-station-skii-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20

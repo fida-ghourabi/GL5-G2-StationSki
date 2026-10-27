@@ -1,10 +1,11 @@
-# Ports NodePort supplementaires : Grafana (30300) et ArgoCD (30081)
+# Ports NodePort supplementaires : Grafana (30300), ArgoCD (30081) et frontend (30082)
 variable "extra_node_ports" {
-  description = "NodePorts supplementaires ouverts sur les noeuds (Grafana, ArgoCD)."
+  description = "NodePorts supplementaires ouverts sur les noeuds (Grafana, ArgoCD, frontend)."
   type        = map(number)
   default = {
-    grafana = 30300
-    argocd  = 30081
+    grafana  = 30300
+    argocd   = 30081
+    frontend = 30082
   }
 }
 

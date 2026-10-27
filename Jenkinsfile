@@ -81,6 +81,9 @@ pipeline {
          * Nom du serveur SonarQube configuré dans Jenkins.
          */
         SONARQUBE_SERVER = 'SonarQube'
+
+        TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
+
     }
 
     stages {

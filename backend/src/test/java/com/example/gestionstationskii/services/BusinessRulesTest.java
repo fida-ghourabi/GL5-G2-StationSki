@@ -27,8 +27,8 @@ class BusinessRulesTest {
         PlanningSlot slot = new PlanningSlot(); slot.setId(2L); slot.setCourse(course); slot.setStatus(SlotStatus.OPEN); slot.setMaxCapacity(6);
         slot.setStartTime(LocalDateTime.now().plusDays(1)); slot.setEndTime(slot.getStartTime().plusHours(1));
         when(skiers.lockById(1L)).thenReturn(Optional.of(skier)); when(slots.lockById(2L)).thenReturn(Optional.of(slot));
-        when(registrations.findBySkierNumSkier(1L)).thenReturn(Collections.emptyList());
-        when(registrations.findByPlanningSlotId(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
+        when(registrations.findBySkier_NumSkier(1L)).thenReturn(Collections.emptyList());
+        when(registrations.findByPlanningSlot_Id(2L)).thenReturn(Arrays.asList(new Registration(), new Registration(), new Registration(), new Registration(), new Registration(), new Registration()));
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class, () -> service.registerSlot(1L, 2L)).getStatus());
         verify(registrations, never()).save(any(Registration.class));
     }
@@ -48,7 +48,7 @@ class BusinessRulesTest {
         PlanningSlot existing = new PlanningSlot(); existing.setId(5L); existing.setInstructor(instructor); existing.setStatus(SlotStatus.OPEN);
         existing.setStartTime(day.atTime(10, 0)); existing.setEndTime(day.atTime(12, 0));
         when(courses.lockById(1L)).thenReturn(Optional.of(course)); when(instructors.lockById(1L)).thenReturn(Optional.of(instructor));
-        when(instructors.findById(1L)).thenReturn(Optional.of(instructor)); when(availability.findByInstructor_NumInstructor(1L)).thenReturn(Collections.singletonList(a));
+        when(instructors.findById(1L)).thenReturn(Optional.of(instructor)); when(instructors.existsById(1L)).thenReturn(true); when(availability.findByInstructor_NumInstructor(1L)).thenReturn(Collections.singletonList(a));
         when(slots.findAll()).thenReturn(Collections.singletonList(existing));
         Requests.Slot input = new Requests.Slot(); input.setCourseId(1L); input.setInstructorId(1L); input.setMaxCapacity(6);
         input.setStartTime(day.atTime(11, 0)); input.setEndTime(day.atTime(13, 0));

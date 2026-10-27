@@ -2,6 +2,7 @@ package com.example.gestionstationskii.services;
 
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -21,6 +22,15 @@ abstract class RegistrationIntegrationSupport {
     @Autowired protected ICourseRepository courses;
     @Autowired protected IInstructorRepository instructors;
     @Autowired protected PlanningSlotRepository slots;
+
+    @AfterEach
+    void cleanRegistrationData() {
+        registrations.deleteAll();
+        slots.deleteAll();
+        instructors.deleteAll();
+        courses.deleteAll();
+        skiers.deleteAll();
+    }
 
     protected Course createCourse() {
         return createCourse(TypeCourse.COLLECTIVE_ADULT);

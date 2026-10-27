@@ -325,7 +325,7 @@ class RegistrationServicesMockTest {
     void bySkierValidatesSkierAndReturnsRepositoryHistory() {
         when(skiers.existsById(10L)).thenReturn(true);
         List<Registration> history = Collections.singletonList(registration(adult, openSlot, adultCourse, false));
-        when(registrations.findBySkierNumSkier(10L)).thenReturn(history);
+        when(registrations.findBySkier_NumSkier(10L)).thenReturn(history);
 
         assertSame(history, service.bySkier(10L));
         when(skiers.existsById(99L)).thenReturn(false);
@@ -414,8 +414,8 @@ class RegistrationServicesMockTest {
                                      List<Registration> slotRegistrations) {
         lenient().when(skiers.lockById(skier.getNumSkier())).thenReturn(Optional.of(skier));
         lenient().when(slots.lockById(slot.getId())).thenReturn(Optional.of(slot));
-        lenient().when(registrations.findBySkierNumSkier(skier.getNumSkier())).thenReturn(skierHistory);
-        lenient().when(registrations.findByPlanningSlotId(slot.getId())).thenReturn(slotRegistrations);
+        lenient().when(registrations.findBySkier_NumSkier(skier.getNumSkier())).thenReturn(skierHistory);
+        lenient().when(registrations.findByPlanningSlot_Id(slot.getId())).thenReturn(slotRegistrations);
     }
 
     private static Skier skier(Long id, LocalDate dateOfBirth) {

@@ -33,7 +33,7 @@ pipeline {
         IMAGE_TAG = 'pending'
         BACKEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-backend"
         FRONTEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-frontend"
-        TESTCONTAINERS_HOST_OVERRIDE = '172.18.0.1'
+        TESTCONTAINERS_HOST_OVERRIDE = '192.168.65.254'
 
     }
 

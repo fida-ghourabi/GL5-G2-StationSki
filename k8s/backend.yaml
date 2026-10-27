@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stationski-backend
+  namespace: stationski
+  labels:
+    app.kubernetes.io/name: stationski-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stationski-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stationski-backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stationski-backend
+          image: IMAGE_PLACEHOLDER
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8087
+          env:
+            - name: DB_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: stationski-backend-config
+                  key: DB_URL
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: stationski-db
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: stationski-db
+                  key: password
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: update
+            - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /stationSki/actuator/health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /stationSki/actuator/health/readiness
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /stationSki/actuator/health/liveness
+              port: http
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stationski-backend
+  namespace: stationski
+  labels:
+    app.kubernetes.io/name: stationski-backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /stationSki/actuator/prometheus
+    prometheus.io/port: "8087"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: stationski-backend
+  ports:
+    - name: http
+      port: 8087
+      targetPort: http

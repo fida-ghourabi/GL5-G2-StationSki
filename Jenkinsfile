@@ -9,16 +9,6 @@ def withAws(Closure body) {
     }
 }
 
-// Compare le hash Git d'un dossier avec celui du dernier build d'image memorise.
-// Retourne [changed: true/false, tree: hash du dossier, tag: tag de l'ancienne image]
-def detectChange(String dir, String stateFile) {
-    def tree = sh(script: "git rev-parse HEAD:${dir}", returnStdout: true).trim()
-    def last = sh(script: "cat '${stateFile}' 2>/dev/null || true", returnStdout: true).trim()
-    def parts = last ? last.tokenize(' ') : []
-    def unchanged = !params.FORCE_BUILD && parts.size() == 2 && parts[0] == tree
-    return [changed: !unchanged, tree: tree, tag: unchanged ? parts[1] : '']
-}
-
 pipeline {
 
     agent any
@@ -28,12 +18,11 @@ pipeline {
     }
 
     parameters {
+        booleanParam(name: 'FORCE_BUILD', defaultValue: false,
+                     description: 'Forcer build, tests, Sonar et images meme sans changement de code (a cocher pour la validation)')
         choice(name: 'ACTION',
                choices: ['apply', 'plan', 'destroy'],
                description: 'apply = build + EKS + deploiement | plan = jusqu au terraform plan | destroy = supprime EKS')
-        booleanParam(name: 'FORCE_BUILD',
-                     defaultValue: false,
-                     description: 'Forcer le rebuild de l image meme si le code backend n a pas change (backend et frontend)')
     }
 
     environment {
@@ -41,22 +30,17 @@ pipeline {
 
         registry           = 'saharsaidani/gestion-station-skii'
         registryCredential = 'dockerhub'
-        frontendRegistry   = 'saharsaidani/gestion-station-skii-frontend'
         dockerImage        = ''
+        FRONTEND_REGISTRY  = 'saharsaidani/gestion-station-skii-frontend'
 
         SONAR_URL          = 'http://sonarqube:9000'
         NEXUS_SNAPSHOTS    = 'http://nexus:8081/repository/maven-snapshots/'
         BACKEND_DIR        = 'backend'
-        FRONTEND_DIR       = 'frontend'
         TERRAFORM_DIR      = 'terraform'
         TF_IN_AUTOMATION   = 'true'
         TF_PLUGIN_CACHE_DIR = '/var/jenkins_home/.terraform.d/plugin-cache'
         // Etat Terraform conserve hors du workspace
         TF_STATE           = '/var/jenkins_home/tfstate/stationski.tfstate'
-        // Dernier build du backend : "<hash du dossier backend> <tag de l'image>"
-        BUILD_STATE        = '/var/jenkins_home/buildstate/backend-image.txt'
-        // Dernier build du frontend : "<hash du dossier frontend> <tag de l'image>"
-        FRONTEND_BUILD_STATE = '/var/jenkins_home/buildstate/frontend-image.txt'
 
         AWS_DEFAULT_REGION = 'us-east-1'
         CLUSTER_NAME       = 'stationski'
@@ -76,42 +60,32 @@ pipeline {
 
     stages {
 
-        stage('CHECKOUT GIT') {
+        stage('1 - Récupération du code (Git)') {
             steps {
                 checkout scm
             }
         }
 
-        // Compare le contenu des dossiers backend et frontend avec ceux du dernier build d'image.
-        // Si identique : on saute le build et on reutilise l'image deja publiee.
-        stage('DETECT CHANGES') {
+        stage('2 - Détection des changements de code') {
             when { expression { env.ACTION != 'destroy' } }
             steps {
                 script {
-                    def be = detectChange(env.BACKEND_DIR, env.BUILD_STATE)
-                    env.BACKEND_TREE = be.tree
-                    env.BACKEND_CHANGED = be.changed.toString()
-                    if (!be.changed) {
-                        env.IMAGE_TAG = be.tag
-                        echo "Backend inchange -> reutilisation de ${registry}:${env.IMAGE_TAG}"
-                    } else {
-                        echo "Backend modifie (ou premier build / FORCE_BUILD) -> nouvelle image"
+                    def base = env.GIT_PREVIOUS_SUCCESSFUL_COMMIT
+                    def backend = true
+                    def frontend = true
+                    if (!params.FORCE_BUILD && base) {
+                        // code retour 0 = aucun changement ; autre = changement (ou commit de base introuvable)
+                        backend  = sh(script: "git diff --quiet ${base} HEAD -- backend",  returnStatus: true) != 0
+                        frontend = sh(script: "git diff --quiet ${base} HEAD -- frontend", returnStatus: true) != 0
                     }
-
-                    def fe = detectChange(env.FRONTEND_DIR, env.FRONTEND_BUILD_STATE)
-                    env.FRONTEND_TREE = fe.tree
-                    env.FRONTEND_CHANGED = fe.changed.toString()
-                    if (!fe.changed) {
-                        env.FRONTEND_TAG = fe.tag
-                        echo "Frontend inchange -> reutilisation de ${frontendRegistry}:${env.FRONTEND_TAG}"
-                    } else {
-                        echo "Frontend modifie (ou premier build / FORCE_BUILD) -> nouvelle image"
-                    }
+                    env.BACKEND_CHANGED  = backend.toString()
+                    env.FRONTEND_CHANGED = frontend.toString()
+                    echo "Backend modifié : ${env.BACKEND_CHANGED} | Frontend modifié : ${env.FRONTEND_CHANGED} | FORCE_BUILD : ${params.FORCE_BUILD}"
                 }
             }
         }
 
-        stage('MVN CLEAN') {
+        stage('3 - Nettoyage Maven') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 dir("${BACKEND_DIR}") {
@@ -120,7 +94,7 @@ pipeline {
             }
         }
 
-        stage('ARTIFACT CONSTRUCTION') {
+        stage('4 - Compilation et package du JAR') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 dir("${BACKEND_DIR}") {
@@ -129,7 +103,7 @@ pipeline {
             }
         }
 
-        stage('UNIT TESTS') {
+        stage('5 - Tests unitaires (JUnit + Mockito)') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 withCredentials([usernamePassword(
@@ -148,7 +122,7 @@ pipeline {
             }
         }
 
-        stage('MVN SONARQUBE') {
+        stage('6 - Analyse qualité SonarQube') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
@@ -165,7 +139,7 @@ pipeline {
             }
         }
 
-        stage('PUBLISH TO NEXUS') {
+        stage('7 - Publication du JAR sur Nexus') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 withCredentials([usernamePassword(
@@ -197,7 +171,7 @@ EOF
             }
         }
 
-        stage('BUILDING OUR IMAGE') {
+        stage('8 - Build image Docker backend') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 script {
@@ -212,7 +186,7 @@ EOF
             }
         }
 
-        stage('DEPLOY OUR IMAGE') {
+        stage('9 - Push image backend sur Docker Hub') {
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 script {
@@ -220,37 +194,27 @@ EOF
                         retry(3) { dockerImage.push() }
                         retry(3) { dockerImage.push('latest') }
                     }
-                    // Memorise le build seulement apres un push reussi
-                    sh '''
-                        mkdir -p "$(dirname "$BUILD_STATE")"
-                        echo "$BACKEND_TREE $IMAGE_TAG" > "$BUILD_STATE"
-                    '''
                 }
             }
         }
 
-        // Le build Angular se fait dans le Dockerfile (multi-stage) : pas besoin de Node sur Jenkins
-        stage('FRONTEND IMAGE') {
+        stage('10 - Image Docker frontend (build + push)') {
             when { expression { env.ACTION != 'destroy' && env.FRONTEND_CHANGED == 'true' } }
             steps {
                 script {
-                    env.FRONTEND_TAG = "front-${BUILD_NUMBER}"
-                    echo "Image : ${frontendRegistry}:${env.FRONTEND_TAG}"
-                    def feImage = docker.build("${frontendRegistry}:${env.FRONTEND_TAG}", "${FRONTEND_DIR}")
+                    def frontImage = "${FRONTEND_REGISTRY}:front-${BUILD_NUMBER}"
+                    echo "Image : ${frontImage}"
+                    retry(3) { sh "docker build -t ${frontImage} frontend" }
                     docker.withRegistry('', registryCredential) {
-                        retry(3) { feImage.push() }
-                        retry(3) { feImage.push('latest') }
+                        retry(3) { sh "docker push ${frontImage}" }
+                        sh "docker tag ${frontImage} ${FRONTEND_REGISTRY}:latest"
+                        retry(3) { sh "docker push ${FRONTEND_REGISTRY}:latest" }
                     }
-                    // Memorise le build seulement apres un push reussi
-                    sh '''
-                        mkdir -p "$(dirname "$FRONTEND_BUILD_STATE")"
-                        echo "$FRONTEND_TREE $FRONTEND_TAG" > "$FRONTEND_BUILD_STATE"
-                    '''
                 }
             }
         }
 
-        stage('TERRAFORM VALIDATE') {
+        stage('11 - Terraform : validation') {
             when { expression { env.ACTION != 'destroy' } }
             steps {
                 dir("${TERRAFORM_DIR}") {
@@ -265,7 +229,7 @@ EOF
             }
         }
 
-        stage('TERRAFORM PLAN') {
+        stage('12 - Terraform : plan') {
             when { expression { env.ACTION == 'apply' || env.ACTION == 'plan' } }
             steps {
                 script {
@@ -280,7 +244,7 @@ EOF
             }
         }
 
-        stage('APPROVAL') {
+        stage('13 - Validation manuelle') {
             when { expression { env.ACTION == 'apply' || env.ACTION == 'destroy' } }
             steps {
                 timeout(time: 30, unit: 'MINUTES') {
@@ -290,7 +254,7 @@ EOF
             }
         }
 
-        stage('TERRAFORM APPLY') {
+        stage('14 - Terraform : création du cluster EKS') {
             when { expression { env.ACTION == 'apply' } }
             steps {
                 script {
@@ -303,7 +267,7 @@ EOF
             }
         }
 
-        stage('KUBERNETES') {
+        stage('15 - Déploiement MySQL sur EKS') {
             when { expression { env.ACTION == 'apply' } }
             steps {
                 script {
@@ -351,12 +315,11 @@ EOF
             }
         }
 
-        stage('ARGOCD') {
+        stage('16 - ArgoCD : déploiement GitOps de l application') {
             when { expression { env.ACTION == 'apply' } }
             steps {
                 script {
                     env.DEPLOY_IMAGE = "${registry}:${env.IMAGE_TAG ?: 'latest'}"
-                    env.FRONTEND_DEPLOY_IMAGE = "${frontendRegistry}:${env.FRONTEND_TAG ?: 'latest'}"
                     withAws {
                         sh '''
                             export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
@@ -381,7 +344,6 @@ EOF
 
                             # Application geree par ArgoCD (GitOps) : chemin k8s/app du depot
                             sed -e "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" \
-                                -e "s|FRONTEND_PLACEHOLDER|$FRONTEND_DEPLOY_IMAGE|g" \
                                 -e "s|REVISION_PLACEHOLDER|$GIT_REVISION|g" \
                                 k8s/argocd/application.yaml | kubectl apply -f -
                             kubectl -n argocd annotate application station-ski argocd.argoproj.io/refresh=hard --overwrite
@@ -401,28 +363,12 @@ EOF
                                 exit 1
                             }
                             kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski --timeout=600s
-
-                            # Meme verification pour le frontend
-                            CURF=""
-                            for i in $(seq 1 120); do
-                                CURF=$(kubectl -n "$K8S_NAMESPACE" get deploy station-ski-frontend \
-                                       -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
-                                [ "$CURF" = "$FRONTEND_DEPLOY_IMAGE" ] && break
-                                sleep 5
-                            done
-                            [ "$CURF" = "$FRONTEND_DEPLOY_IMAGE" ] || {
-                                echo "ArgoCD n'a pas synchronise l'image frontend attendue ($FRONTEND_DEPLOY_IMAGE)"
-                                kubectl -n argocd describe application station-ski | tail -40
-                                exit 1
-                            }
-                            kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski-frontend --timeout=300s
                             kubectl -n argocd get applications
                             kubectl -n "$K8S_NAMESPACE" get pods,svc
 
                             NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
                             echo "=========================================================="
-                            echo "Frontend    : http://$NODE_IP:30082"
-                            echo "Backend     : http://$NODE_IP:30080/stationSki/swagger-ui/index.html"
+                            echo "Application : http://$NODE_IP:30080/stationSki/swagger-ui/index.html"
                             echo "ArgoCD      : http://$NODE_IP:30081  (utilisateur admin)"
                             echo "Mot de passe ArgoCD : kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password} | base64 -d"
                             echo "=========================================================="
@@ -432,7 +378,7 @@ EOF
             }
         }
 
-        stage('MONITORING') {
+        stage('17 - Monitoring Prometheus et Grafana') {
             when { expression { env.ACTION == 'apply' } }
             steps {
                 script {
@@ -463,7 +409,7 @@ EOF
             }
         }
 
-        stage('TERRAFORM DESTROY') {
+        stage('18 - Terraform : destruction du cluster EKS') {
             when { expression { env.ACTION == 'destroy' } }
             steps {
                 script {

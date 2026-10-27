@@ -257,11 +257,10 @@ EOF
 
                                 kubectl apply -f k8s/storageclass.yaml
                                 kubectl apply -f k8s/mysql.yaml
-                                kubectl apply -f k8s/app.yaml
-                                kubectl -n "$K8S_NAMESPACE" set image deployment/stationski stationski="$DEPLOY_IMAGE"
-
                                 kubectl -n "$K8S_NAMESPACE" rollout status deployment/mysql --timeout=600s
-                                kubectl -n "$K8S_NAMESPACE" rollout status deployment/stationski --timeout=600s
+
+                                sed "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" k8s/app.yaml | kubectl apply -f -
+                                kubectl -n "$K8S_NAMESPACE" rollout status deployment/station-ski --timeout=600s
                                 kubectl -n "$K8S_NAMESPACE" get pods,svc
 
                                 NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')

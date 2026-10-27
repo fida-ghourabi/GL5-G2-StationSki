@@ -137,13 +137,15 @@ class RegistrationServicesMockTest {
         Course targetCourse = course(21L, courseType);
         PlanningSlot targetSlot = slot(31L, targetCourse, openSlot.getStartTime(), 3, SlotStatus.OPEN);
         prepareRegistration(candidate, targetSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+        Long candidateId = candidate.getNumSkier();
+        Long targetSlotId = targetSlot.getId();
 
         if (accepted) {
             when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
-            assertSame(candidate, service.registerSlot(candidate.getNumSkier(), targetSlot.getId()).getSkier());
+            assertSame(candidate, service.registerSlot(candidateId, targetSlotId).getSkier());
         } else {
             BusinessException error = assertThrows(BusinessException.class,
-                    () -> service.registerSlot(candidate.getNumSkier(), targetSlot.getId()));
+                    () -> service.registerSlot(candidateId, targetSlotId));
             assertEquals(HttpStatus.CONFLICT, error.getStatus());
             verify(registrations, never()).save(any(Registration.class));
         }

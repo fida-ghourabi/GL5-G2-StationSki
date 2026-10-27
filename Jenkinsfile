@@ -30,7 +30,6 @@ pipeline {
 
         registry           = 'saharsaidani/gestion-station-skii'
         registryCredential = 'dockerhub'
-        dockerImage        = ''
         FRONTEND_REGISTRY  = 'saharsaidani/gestion-station-skii-frontend'
 
         SONAR_URL          = 'http://sonarqube:9000'
@@ -44,6 +43,7 @@ pipeline {
 
         AWS_DEFAULT_REGION = 'us-east-1'
         CLUSTER_NAME       = 'stationski'
+        NODEGROUP_NAME     = 'stationski-nodes'
         K8S_NAMESPACE      = 'station-ski'
         GIT_REVISION       = 'feature/sahar-saidani'
 
@@ -181,7 +181,7 @@ EOF
                     ).trim()
                     env.IMAGE_TAG = "${pomVersion.replace('-SNAPSHOT', '')}-${BUILD_NUMBER}"
                     echo "Image : ${registry}:${env.IMAGE_TAG}"
-                    dockerImage = docker.build("${registry}:${env.IMAGE_TAG}", "${BACKEND_DIR}")
+                    docker.build("${registry}:${env.IMAGE_TAG}", "${BACKEND_DIR}")
                 }
             }
         }
@@ -190,9 +190,10 @@ EOF
             when { expression { env.ACTION != 'destroy' && env.BACKEND_CHANGED == 'true' } }
             steps {
                 script {
+                    def backendImage = docker.image("${registry}:${env.IMAGE_TAG}")
                     docker.withRegistry('', registryCredential) {
-                        retry(3) { dockerImage.push() }
-                        retry(3) { dockerImage.push('latest') }
+                        retry(3) { backendImage.push() }
+                        retry(3) { backendImage.push('latest') }
                     }
                 }
             }
@@ -283,6 +284,28 @@ EOF
                                 export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
                                 aws eks update-kubeconfig --region "$AWS_DEFAULT_REGION" \
                                   --name "$CLUSTER_NAME" --kubeconfig "$KUBECONFIG"
+
+                                # 1. Attendre que le node group soit ACTIVE cote AWS
+                                aws eks wait nodegroup-active --cluster-name "$CLUSTER_NAME" \
+                                  --nodegroup-name "$NODEGROUP_NAME" --region "$AWS_DEFAULT_REGION"
+
+                                # 2. Attendre que les noeuds apparaissent dans Kubernetes
+                                N=0
+                                for i in $(seq 1 60); do
+                                    N=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
+                                    [ "$N" -gt 0 ] && break
+                                    echo "En attente de noeuds ($i/60)..."
+                                    sleep 10
+                                done
+                                if [ "$N" -eq 0 ]; then
+                                    echo "=== AUCUN NOEUD ==="
+                                    aws eks describe-nodegroup --cluster-name "$CLUSTER_NAME" \
+                                      --nodegroup-name "$NODEGROUP_NAME" --region "$AWS_DEFAULT_REGION" \
+                                      --query 'nodegroup.{status:status,scaling:scalingConfig,health:health}'
+                                    exit 1
+                                fi
+
+                                # 3. Attendre qu'ils soient Ready
                                 kubectl wait --for=condition=Ready nodes --all --timeout=600s
                                 kubectl get nodes -o wide
 

@@ -33,7 +33,6 @@ pipeline {
         IMAGE_TAG = 'pending'
         BACKEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-backend"
         FRONTEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-frontend"
-
     }
 
     stages {
@@ -193,11 +192,6 @@ pipeline {
         stage('Déploiement sur EKS') {
             when { expression { params.DEPLOY_TO_EKS } }
             steps {
-                script {
-                    if (env.BRANCH_NAME != 'feature/hajer-iben-nasr') {
-                        error('Le déploiement AWS est autorisé uniquement depuis feature/hajer-iben-nasr.')
-                    }
-                }
                 withCredentials([
                     string(credentialsId: env.AWS_ACCESS_KEY_ID_CREDENTIALS, variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: env.AWS_SECRET_ACCESS_KEY_CREDENTIALS, variable: 'AWS_SECRET_ACCESS_KEY'),

@@ -87,11 +87,11 @@ Le contrôle de branche (`feature/inscription`) est **actuellement désactivé**
 
 `./mvnw clean verify` compile, exécute les tests et applique le contrôle JaCoCo (couverture minimale de `RegistrationServicesImpl` : 80 % des lignes et 65 % des branches). Les rapports JUnit et le rapport HTML JaCoCo sont archivés.
 
-Les tests ne s'exécutent **pas sur H2** (aucune dépendance H2 dans le projet). Ils se répartissent ainsi :
+Les tests s'exécutent sur une base H2 en mémoire via le profil `test` ; ils n'ont pas besoin d'un conteneur MySQL ni d'un accès Docker. La configuration MySQL de l'application normale n'est pas remplacée. Ils se répartissent ainsi :
 
 - **Tests unitaires et MockMvc** (Mockito) : aucune infrastructure externe.
-- **Tests d'intégration et de repository** : utilisent **Testcontainers avec `mysql:8.0.33`**. L'agent Jenkins doit donc pouvoir joindre le Docker daemon (par exemple via le socket Docker monté dans le conteneur Jenkins) et télécharger l'image MySQL. `PlanningServicesIntegrationTest` est ignoré si Docker est absent ; les autres tests Testcontainers échouent sans Docker.
-- **Tests utilisant le profil `test`** (`application-test.properties`) : se connectent à une base MySQL via `TEST_DB_URL`, `TEST_DB_USERNAME` et `TEST_DB_PASSWORD` (par défaut `localhost:3306`). Fournir ces variables, ou une base MySQL accessible, dans l'environnement du build.
+- **Tests d'intégration et de repository** : utilisent H2, créée en mémoire et détruite à la fin des tests.
+- **Tests Mockito et MockMvc** : aucune base de données ni infrastructure externe.
 
 ### Publication
 

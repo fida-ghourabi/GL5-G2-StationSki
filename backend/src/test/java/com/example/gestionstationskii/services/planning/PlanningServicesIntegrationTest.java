@@ -10,12 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -29,7 +24,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests SANS MOCK du planning : vrai Spring, vraie base MySQL (Testcontainers), aucun repository simulé.
+ * Tests SANS MOCK du planning : vrai Spring et base H2 en mémoire, aucun repository simulé.
  *
  * Les 11 premiers tests reprennent un à un ceux de PlanningServicesMockTest (même nom, même règle métier).
  * Les tests suivants complètent avec des règles que PlanningServicesMockTest ne couvre pas encore.
@@ -37,21 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@Testcontainers(disabledWithoutDocker = true)
 class PlanningServicesIntegrationTest {
-
-    @Container
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.33")
-            .withDatabaseName("planning_test")
-            .withUsername("planning_test")
-            .withPassword("planning_test");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-    }
 
     @Autowired private IPlanningServices service;
     @Autowired private ICourseRepository courses;

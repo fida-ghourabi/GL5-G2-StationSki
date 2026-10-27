@@ -7,12 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,16 +16,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@Testcontainers
+@ActiveProfiles("test")
 @Transactional
 class PaymentServicesWithoutMockitoTest {
-
-    @Container
-    private static final MySQLContainer<?> MYSQL =
-            new MySQLContainer<>("mysql:8.0.33")
-                    .withDatabaseName("station_test")
-                    .withUsername("test")
-                    .withPassword("test");
 
     @Autowired
     private IPaymentServices paymentService;
@@ -45,15 +34,6 @@ class PaymentServicesWithoutMockitoTest {
 
     @Autowired
     private ISubscriptionRepository subscriptionRepository;
-
-    @DynamicPropertySource
-    static void configureDatabase(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
-        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
-    }
 
     @BeforeEach
     void cleanDatabase() {

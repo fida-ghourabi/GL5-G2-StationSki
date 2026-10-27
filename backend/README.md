@@ -59,13 +59,13 @@ Les tests n'ont pas été exécutés. Pour les lancer explicitement dans votre e
 ```powershell
 # Tests métier et structure isolés, sans base
 mvn '-Dtest=BusinessRulesTest,ServiceStructureTest' test
-# Suite complète : le test contextLoads existant exige une base et un schéma compatibles
+# Suite complète : la base H2 de test est créée automatiquement
 mvn test
 # Compilation seule, sans compilation ni exécution des tests
 mvn '-Dmaven.test.skip=true' compile
 ```
 
-`BusinessRulesTest` couvre la capacité, un conflit moniteur, les transitions financières, le plafond de remboursement, le reçu, les dates d'abonnement, les créneaux adjacents et l’orchestration via les interfaces. Les tests des fonctionnalités retirées ont été supprimés. Les transactions/verrous nécessitent encore des tests d'intégration concurrents sur MySQL ; les mocks ne prouvent pas leur comportement réel.
+`BusinessRulesTest` couvre la capacité, un conflit moniteur, les transitions financières, le plafond de remboursement, le reçu, les dates d'abonnement, les créneaux adjacents et l’orchestration via les interfaces. Les tests des fonctionnalités retirées ont été supprimés. H2 valide les règles et mappings sous tests, mais ne garantit pas une équivalence complète avec MySQL pour les transactions/verrous concurrents.
 
 `ServiceStructureTest` vérifie que les huit domaines ont un contrat de service, une implémentation et un contrôleur dépendant du contrat, ainsi que des dépendances `final` injectées par constructeur. Ces tests ont été préparés/compilés, pas exécutés.
 

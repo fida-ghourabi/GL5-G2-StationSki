@@ -4,9 +4,7 @@ import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.MySQLContainer;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -15,25 +13,8 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Collections;
 
 @SpringBootTest
+@ActiveProfiles("test")
 abstract class RegistrationIntegrationSupport {
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0.33")
-            .withDatabaseName("station_test")
-            .withUsername("test")
-            .withPassword("test");
-
-    static {
-        MYSQL.start();
-    }
-
-    @DynamicPropertySource
-    static void configureDatabase(DynamicPropertyRegistry registry) {
-        registry.add("server.servlet.context-path", () -> "");
-        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
-        registry.add("spring.datasource.username", MYSQL::getUsername);
-        registry.add("spring.datasource.password", MYSQL::getPassword);
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
-    }
 
     @Autowired protected IRegistrationRepository registrations;
     @Autowired protected ISkierRepository skiers;

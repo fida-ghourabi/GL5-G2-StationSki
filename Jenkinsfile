@@ -159,10 +159,6 @@ pipeline {
             when { expression { params.PLAN_TERRAFORM || params.APPLY_TERRAFORM || params.DEPLOY_TO_EKS } }
             steps {
                 script {
-                    // Contrôle de branche désactivé temporairement.
-                    // if (env.BRANCH_NAME != 'feature/inscription') {
-                    //     error('Les opérations AWS sont autorisées uniquement depuis feature/inscription.')
-                    // }
                     if (!params.EKS_API_CIDR?.trim()) {
                         error('Renseigne EKS_API_CIDR avec le CIDR public de Jenkins (par exemple x.x.x.x/32) avant Terraform.')
                     }
@@ -196,6 +192,11 @@ pipeline {
         stage('Déploiement sur EKS') {
             when { expression { params.DEPLOY_TO_EKS } }
             steps {
+                script {
+                    if (env.BRANCH_NAME != 'feature/hajer-iben-nasr') {
+                        error('Le déploiement AWS est autorisé uniquement depuis feature/hajer-iben-nasr.')
+                    }
+                }
                 withCredentials([
                     string(credentialsId: env.AWS_ACCESS_KEY_ID_CREDENTIALS, variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: env.AWS_SECRET_ACCESS_KEY_CREDENTIALS, variable: 'AWS_SECRET_ACCESS_KEY'),

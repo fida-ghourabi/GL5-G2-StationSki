@@ -450,6 +450,37 @@ pipeline {
                     }
                 }
             }
+
+            /*
+             * ============================================================
+             * Stage 10 : TEST AWS CREDENTIALS
+             * ============================================================
+             *
+             * Vérifie l'identité AWS du Learner Lab sans créer
+             * ni modifier de ressource AWS.
+             *
+             * Le credential Jenkins doit être de type Secret file
+             * et avoir l'identifiant : aws-academy-credentials
+             */
+            stage('TEST AWS CREDENTIALS') {
+                steps {
+                    withCredentials([
+                        file(
+                            credentialsId: 'aws-credentials',
+                            variable: 'AWS_CREDENTIALS_FILE'
+                        )
+                    ]) {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="us-east-1"
+
+                            aws --version
+                            aws sts get-caller-identity
+                        '''
+                    }
+                }
+            }
         }
     }
 

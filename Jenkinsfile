@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -15,10 +14,11 @@ pipeline {
         booleanParam(name: 'PUSH_IMAGES', defaultValue: true, description: 'Publier les images backend et frontend sur Docker Hub.')
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: true, description: 'Vérifier Terraform et afficher le plan sans appliquer ni déployer.')
         booleanParam(name: 'APPLY_TERRAFORM', defaultValue: true, description: 'Créer ou mettre à jour VPC, EKS et RDS (coûts AWS).')
-        booleanParam(name: 'DEPLOY_TO_EKS', defaultValue: false, description: 'Déployer les images sur le cluster EKS.')
+        booleanParam(name: 'DEPLOY_TO_EKS', defaultValue: true, description: 'Déployer les images sur le cluster EKS.')
         booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: true, description: 'DANGER : supprime VPC, EKS et RDS (données perdues) à la fin du build, après le apply.')
         booleanParam(name: 'DEPLOY_MONITORING', defaultValue: true, description: 'Installer Prometheus et Grafana (Helm) apres le deploiement sur EKS.')
         string(name: 'GIT_REVISION', defaultValue: 'main', description: 'Branche Git suivie par ArgoCD (les fichiers k8s/app doivent etre pousses sur cette branche).')
+        string(name: 'TEST_MINUTES', defaultValue: '15', description: 'Duree de la pause pour tester (Grafana, ArgoCD, application) avant la destruction automatique.')
         string(name: 'GIT_REPO_URL', defaultValue: '', description: 'URL HTTPS du depot GitHub pour ArgoCD (laisser vide = URL du checkout Jenkins).')
         string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'Région du Learner Lab.')
         string(name: 'EKS_CLUSTER_NAME', defaultValue: 'stationski-cluster', description: 'Nom du cluster Terraform/EKS.')
@@ -362,6 +362,51 @@ pipeline {
                 }
             }
         }
+
+        stage('Pause : tester avant la destruction') {
+            when { expression { params.DEPLOY_TO_EKS && params.DESTROY_TERRAFORM } }
+            steps {
+                withCredentials([
+                    string(credentialsId: env.AWS_ACCESS_KEY_ID_CREDENTIALS, variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: env.AWS_SECRET_ACCESS_KEY_CREDENTIALS, variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: env.AWS_SESSION_TOKEN_CREDENTIALS, variable: 'AWS_SESSION_TOKEN')
+                ]) {
+                    withEnv(["AWS_REGION=${params.AWS_REGION}",
+                             "EKS_CLUSTER_NAME=${params.EKS_CLUSTER_NAME}"]) {
+                        sh '''
+                            set +x
+                            kubeconfig_file="$(mktemp)"
+                            chmod 600 "$kubeconfig_file"
+                            trap 'rm -f "$kubeconfig_file"' EXIT
+                            export KUBECONFIG="$kubeconfig_file"
+                            aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
+                            host() { kubectl -n "$1" get svc "$2" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true; }
+                            echo "=========================================================="
+                            echo "Application : http://$(host stationski stationski-frontend)"
+                            echo "ArgoCD      : http://$(host argocd argocd-server)  (admin)"
+                            echo "Mot de passe ArgoCD : $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)"
+                            echo "Grafana     : http://$(host monitoring monitoring-grafana)  (admin)"
+                            echo "Prometheus  : http://$(host monitoring monitoring-kube-prometheus-prometheus):9090"
+                            echo "=========================================================="
+                            kubectl get nodes
+                            kubectl -n stationski get pods,svc
+                        '''
+                    }
+                }
+                script {
+                    try {
+                        timeout(time: params.TEST_MINUTES.toInteger(), unit: 'MINUTES') {
+                            input message: 'Infrastructure en ligne : teste maintenant. Clique pour detruire (sinon destruction automatique a la fin du delai).',
+                                  ok: 'Detruire maintenant'
+                        }
+                    } catch (err) {
+                        echo "Delai ecoule ou pause interrompue : on passe a la destruction."
+                    }
+                }
+            }
+        }
+
 
         stage('Terraform : destroy') {
             when { expression { params.DESTROY_TERRAFORM } }

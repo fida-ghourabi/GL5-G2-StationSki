@@ -1,0 +1,27 @@
+# Application ArgoCD : ArgoCD surveille le dossier k8s/app du depot Git
+# et applique automatiquement son contenu sur le cluster (GitOps).
+# Les *_PLACEHOLDER sont remplaces par Jenkins (sed) avant le kubectl apply.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: station-ski
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: REPO_URL_PLACEHOLDER
+    targetRevision: REVISION_PLACEHOLDER
+    path: k8s/app
+    kustomize:
+      images:
+        - stationski-backend=BACKEND_IMAGE_PLACEHOLDER
+        - stationski-frontend=FRONTEND_IMAGE_PLACEHOLDER
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: stationski
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

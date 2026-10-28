@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: stationski-backend
-          image: IMAGE_PLACEHOLDER
+          image: stationski-backend
           imagePullPolicy: Always
           ports:
             - name: http
@@ -48,6 +48,8 @@ spec:
               value: update
             - name: MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED
               value: "true"
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: health,info,prometheus
           resources:
             requests:
               cpu: 250m
@@ -82,23 +84,3 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: stationski-backend
-  namespace: stationski
-  labels:
-    app.kubernetes.io/name: stationski-backend
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/path: /stationSki/actuator/prometheus
-    prometheus.io/port: "8087"
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: stationski-backend
-  ports:
-    - name: http
-      port: 8087
-      targetPort: http

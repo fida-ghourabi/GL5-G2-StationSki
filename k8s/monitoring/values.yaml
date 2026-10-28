@@ -1,0 +1,50 @@
+# kube-prometheus-stack : version allegee pour un petit cluster EKS (3 x t3.medium)
+# Pas de stockage persistant (pas d'EBS CSI necessaire) : les metriques sont perdues
+# si le pod Prometheus redemarre. Suffisant pour une demo / un rendu.
+alertmanager:
+  enabled: false
+
+grafana:
+  service:
+    type: LoadBalancer
+    nodePort: 30300
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+
+prometheus:
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    retention: 3d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 800Mi
+      limits:
+        memory: 1500Mi
+    # Collecte des metriques Spring Boot du backend (endpoint actuator/prometheus)
+    additionalScrapeConfigs:
+      - job_name: stationski-backend
+        metrics_path: /stationSki/actuator/prometheus
+        static_configs:
+          - targets:
+              - stationski-backend.stationski.svc.cluster.local:8087
+
+# Composants du plan de controle non accessibles sur EKS (evite de fausses alertes)
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

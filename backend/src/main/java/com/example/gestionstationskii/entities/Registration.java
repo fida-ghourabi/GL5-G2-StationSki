@@ -29,7 +29,7 @@ public class Registration implements Serializable {
 	@Column(nullable = false, columnDefinition = "boolean default false")
 	boolean cancelled;
 	@ManyToOne
-	PlanningSlot planningSlot;
+	private PlanningSlot planningSlot;
 
 	@JsonIgnore
 	@ManyToOne

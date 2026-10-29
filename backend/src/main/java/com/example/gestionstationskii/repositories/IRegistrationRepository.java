@@ -2,7 +2,6 @@ package com.example.gestionstationskii.repositories;
 
 import com.example.gestionstationskii.entities.*;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -25,8 +24,6 @@ public interface IRegistrationRepository extends org.springframework.data.jpa.re
     @Query("select count(distinct r) from Registration r " +
             "where r.numWeek = ?1 and r.skier.numSkier = ?2 and r.course.numCourse = ?3")
     long countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(int numWeek, Long numSkier, Long numCourse);
-
-  //  long countDistinctByNumWeekAndSkier_NumSkierAndCourse_NumCourse(int numWeek, Long numSkier, Long numCourse);
 
 
 

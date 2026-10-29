@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 
@@ -14,6 +16,8 @@ import java.util.List;
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class SkierServicesImpl implements ISkierServices {
+
+    private static final String SKIER = "Skieur";
 
     private final ISkierRepository skierRepository;
 
@@ -56,7 +60,7 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public Skier assignSkierToSubscription(Long numSkier, Long numSubscription) {
         Checks.id(numSkier); Checks.id(numSubscription);
-        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER));
         Subscription subscription = subscriptionRepository.lockById(numSubscription).orElseThrow(() -> BusinessException.missing("Abonnement"));
         Skier owner = skierRepository.findBySubscription(subscription);
         if (owner != null) throw BusinessException.conflict("Abonnement déjà affecté");
@@ -76,7 +80,7 @@ public class SkierServicesImpl implements ISkierServices {
 
     @Override
     public void removeSkier(Long numSkier) {
-        Skier skier = retrieveSkier(numSkier);
+        Skier skier = findSkier(numSkier);
         if (registrationRepository.existsBySkier_NumSkier(numSkier)
                 || paymentRepository.existsBySkier_NumSkier(numSkier))
             throw BusinessException.conflict("Skieur ayant un historique d'inscription ou de paiement : suppression refusée");
@@ -86,14 +90,18 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Skier retrieveSkier(Long numSkier) {
+        return findSkier(numSkier);
+    }
+
+    private Skier findSkier(Long numSkier) {
         Checks.id(numSkier);
-        return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+        return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER));
     }
 
     @Override
     public Skier assignSkierToPiste(Long numSkieur, Long numPiste) {
         Checks.id(numSkieur); Checks.id(numPiste);
-        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing(SKIER));
         Piste piste = pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
         if (skier.getPistes() == null) skier.setPistes(new HashSet<>());
         if (!skier.getPistes().add(piste)) throw BusinessException.conflict("Skieur déjà affecté à cette piste");
@@ -110,13 +118,13 @@ public class SkierServicesImpl implements ISkierServices {
 
     private void validate(Skier skier) {
         Checks.text(skier.getFirstName(), "Prénom"); Checks.text(skier.getLastName(), "Nom"); Checks.text(skier.getCity(), "Ville");
-        Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(java.time.LocalDate.now()), "Date de naissance passée requise");
+        Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(LocalDate.now(ZoneId.systemDefault())), "Date de naissance passée requise");
     }
     @Override
     public Skier updateSkier(Skier input) {
         validate(input);
         Checks.id(input.getNumSkier());
-        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing(SKIER));
         current.setFirstName(input.getFirstName()); current.setLastName(input.getLastName());
         current.setCity(input.getCity()); current.setDateOfBirth(input.getDateOfBirth());
         return skierRepository.save(current);

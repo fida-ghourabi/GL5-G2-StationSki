@@ -577,6 +577,75 @@ pipeline {
             }
         }
 
+
+
+                stage('DEPLOY TO AWS KUBERNETES') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDENTIALS_FILE'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                        export AWS_DEFAULT_REGION="$AWS_REGION"
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
+
+                        # 1. Adresse de la base et ARN du secret (outputs Terraform)
+                        cd "$WORKSPACE/$TERRAFORM_DIR"
+                        RDS_ENDPOINT=$(terraform output -raw rds_endpoint)
+                        RDS_SECRET_ARN=$(terraform output -raw rds_master_secret_arn)
+                        cd "$WORKSPACE"
+
+                        # 2. Identifiants de la base depuis Secrets Manager
+                        SECRET_JSON=$(aws secretsmanager get-secret-value \
+                            --secret-id "$RDS_SECRET_ARN" \
+                            --query SecretString --output text)
+                        DB_USER=$(echo "$SECRET_JSON" | jq -r .username)
+                        DB_PASS=$(echo "$SECRET_JSON" | jq -r .password)
+
+                        # 3. Namespace
+                        kubectl apply -f k8s/backend/namespace.yaml
+
+                        # 4. Secret Kubernetes : DB_URL, DB_USERNAME, DB_PASSWORD
+                        kubectl -n stationski create secret generic db-credentials \
+                            --from-literal=DB_URL="jdbc:mysql://${RDS_ENDPOINT}:3306/skidb?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8" \
+                            --from-literal=DB_USERNAME="$DB_USER" \
+                            --from-literal=DB_PASSWORD="$DB_PASS" \
+                            --dry-run=client -o yaml | kubectl apply -f -
+
+                        # 5. Deployment (remplace le tag de l'image)
+                        sed -e "s|IMAGE_TAG|${IMAGE_TAG}|" \
+                            k8s/backend/deployment.yaml | kubectl apply -f -
+
+                        # 6. Service
+                        kubectl apply -f k8s/backend/service.yaml
+
+                        # 7. Attendre que les pods soient prêts (sinon afficher les logs)
+                        kubectl -n stationski rollout status deployment/backend --timeout=420s || {
+                            kubectl -n stationski get pods
+                            kubectl -n stationski describe pods -l app=backend | tail -40
+                            kubectl -n stationski logs deploy/backend --tail=100
+                            exit 1
+                        }
+
+                        # 8. Test de santé depuis l'intérieur du cluster
+                        kubectl -n stationski delete pod curl-test --ignore-not-found
+                        kubectl -n stationski run curl-test --rm -i --restart=Never \
+                            --image=curlimages/curl --command -- \
+                            curl -sf http://backend:8087/stationSki/actuator/health
+
+                        # 9. Preuve que Flyway a bien migré
+                        kubectl -n stationski logs deploy/backend | grep -i "flyway\|migrat" || true
+
+                        kubectl -n stationski get pods
+                    '''
+                }
+            }
+        }
+
     }
 
     /*

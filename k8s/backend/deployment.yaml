@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: stationski
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: fidagh/gestion-station-skii-backend:IMAGE_TAG
+          ports:
+            - containerPort: 8087
+          envFrom:
+            - secretRef:
+                name: db-credentials
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=60"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 768Mi
+          startupProbe:
+            httpGet:
+              path: /stationSki/actuator/health/liveness
+              port: 8087
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /stationSki/actuator/health/readiness
+              port: 8087
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /stationSki/actuator/health/liveness
+              port: 8087
+            periodSeconds: 20

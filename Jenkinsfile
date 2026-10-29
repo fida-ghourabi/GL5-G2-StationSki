@@ -638,7 +638,7 @@ pipeline {
                             curl -sf http://backend:8087/stationSki/actuator/health
 
                         # 9. Preuve que Flyway a bien migré
-                        kubectl -n stationski logs deploy/backend | grep -i "flyway\|migrat" || true
+                        kubectl -n stationski logs deploy/backend | grep -i -E "flyway|migrat" || true
 
                         kubectl -n stationski get pods
                     '''

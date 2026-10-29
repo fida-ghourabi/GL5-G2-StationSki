@@ -2,6 +2,7 @@ package com.example.gestionstationskii.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import com.example.gestionstationskii.services.*;
@@ -19,30 +20,30 @@ public class SkierRestController {
 
     @Operation(summary = "Modifier les informations personnelles d'un skieur")
     @PutMapping("/update")
-    public Skier update(@RequestBody Skier skier) { return skierServices.updateSkier(skier); }
+    public Skier update(@RequestBody Requests.SkierInput skier) { return skierServices.updateSkier(skier.toEntity()); }
 
     @Operation(summary = "Rechercher par nom et ville ; pagination indexée à zéro")
     @GetMapping("/search")
     public org.springframework.data.domain.Page<Skier> search(@RequestParam(defaultValue = "") String name,
-            @RequestParam(defaultValue = "") String city, @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) { return skierServices.search(name, city, page, size); }
+                                                              @RequestParam(defaultValue = "") String city, @RequestParam(defaultValue = "0") int page,
+                                                              @RequestParam(defaultValue = "20") int size) { return skierServices.search(name, city, page, size); }
 
     @Operation(description = "Add Skier")
     @PostMapping("/add")
-    public Skier addSkier(@RequestBody Skier skier){
-        return  skierServices.addSkier(skier);
+    public Skier addSkier(@RequestBody Requests.SkierInput skier){
+        return  skierServices.addSkier(skier.toEntity());
     }
 
     @Operation(description = "Add Skier And Assign To Course")
     @PostMapping("/addAndAssign/{numCourse}")
-    public Skier addSkierAndAssignToCourse(@RequestBody Skier skier,
+    public Skier addSkierAndAssignToCourse(@RequestBody Requests.SkierInput skier,
                                            @PathVariable("numCourse") Long numCourse){
-        return  skierServices.addSkierAndAssignToCourse(skier,numCourse);
+        return  skierServices.addSkierAndAssignToCourse(skier.toEntity(),numCourse);
     }
     @Operation(description = "Assign Skier To Subscription")
     @PutMapping("/assignToSub/{numSkier}/{numSub}")
     public Skier assignToSubscription(@PathVariable("numSkier")Long numSkier,
-                               @PathVariable("numSub") Long numSub){
+                                      @PathVariable("numSub") Long numSub){
         return skierServices.assignSkierToSubscription(numSkier, numSub);
     }
 

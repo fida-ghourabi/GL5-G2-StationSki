@@ -32,7 +32,6 @@ public class Course implements Serializable {
 	Support support;
 	Float price;
 	/** Legacy display value; precise scheduling is stored in PlanningSlot. */
-	@Deprecated
 	int timeSlot;
 
 	@JsonIgnore

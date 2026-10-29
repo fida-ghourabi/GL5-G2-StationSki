@@ -8,6 +8,16 @@ services:
       context: ./devops
       dockerfile: Dockerfile.jenkins
     image: stationski-jenkins:local
+    environment:
+      # Only CI uses this disposable database, never the host skidb.
+      SPRING_PROFILES_ACTIVE: test
+      TEST_DB_URL: jdbc:mysql://ci-db:3306/station_test?serverTimezone=UTC
+      TEST_DB_USERNAME: ci
+      TEST_DB_PASSWORD: local_ci_only
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    depends_on:
+      ci-db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8080:8080"
     # Local lab only: jobs can control the Docker host through this socket.
@@ -17,6 +27,23 @@ services:
     volumes:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+
+  ci-db:
+    image: mysql:8.0.33
+    environment:
+      MYSQL_DATABASE: station_test
+      MYSQL_USER: ci
+      MYSQL_PASSWORD: local_ci_only
+      MYSQL_ROOT_PASSWORD: local_ci_root_only
+    # Disposable test data; no host port and no persistent application volume.
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D station_test -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   sonar-db:
     image: postgres:16

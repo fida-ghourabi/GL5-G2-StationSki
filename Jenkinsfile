@@ -31,7 +31,9 @@ pipeline {
         }
         stage('UNIT AND CRUD TESTS') {
             steps {
-                dir('backend') { sh 'mvn -B test -Dspring.profiles.active=crud-test' }
+                dir('backend') { // Team MySQL tests use the dedicated CI DB; other suites start Testcontainers.
+                    // Preserve each test class's own @ActiveProfiles declaration.
+                    sh 'mvn -B verify' }
             }
         }
         stage('MVN SONARQUBE') {

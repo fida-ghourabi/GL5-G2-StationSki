@@ -6,7 +6,11 @@ Required credentials: Secret text `sonarqube-token`; username/password `nexus-cr
 
 ## Team integration warning
 
-This personal branch now includes the latest team `develop` tests. The earlier 26-test CI success predates that integration. Some teammates' integration tests use MySQL/Testcontainers and the `test` profile; do not assume `crud-test` alone isolates every test. The combined full CI suite requires a fresh review of its test database/container settings before the next build. The existing team JaCoCo report runs at `verify` with a registration coverage gate; keep this configuration rather than duplicating the plugin.
+This personal branch includes the latest team `develop` tests. The earlier 26-test CI success predates that integration. Jenkins now uses the `test` profile with `TEST_DB_*` pointing exclusively to the disposable `ci-db` service (no published port, tmpfs data), while each class retains its own profile and Testcontainers configuration. Do not point these settings at application data: the tests create/drop tables. `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` allows tests inside Jenkins to reach Docker Desktop's mapped container ports. The team JaCoCo configuration runs at `verify`, including its registration coverage gate; the test stage now invokes `mvn verify`.
+
+Validation ran inside the Jenkins container with the actual Docker socket, Java 17 and Maven3: **203 tests passed, 0 failed, 0 skipped**, and all JaCoCo coverage gates passed (`mvn clean verify`). On this personal branch only, stale repository method stubs in `BusinessRulesTest` and `RegistrationServicesMockTest` were aligned with the service queries, and the planning mock now supplies `existsById`. No assertions were weakened, no tests were disabled, and production business logic was unchanged. Shared `develop` was not modified by these CI fixes. The complete Jenkins job (including Sonar/Nexus/Docker publishing) must still be rerun on the new branch.
+
+Recreate the local environment after pulling configuration changes: `docker compose -f compose.devops.yml up -d jenkins`. This also starts its isolated CI database. Only one job should use that shared CI database at a time; separate jobs require separate databases.
 
 ## Before running
 

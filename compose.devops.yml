@@ -82,6 +82,9 @@ services:
 
   nexus:
     image: sonatype/nexus3:latest
+    environment:
+      # Reduced local-lab allocation; not production sizing.
+      INSTALL4J_ADD_VM_PARAMS: -Xms512m -Xmx1024m -XX:MaxDirectMemorySize=512m
     ports:
       - "127.0.0.1:8081:8081"
     volumes:

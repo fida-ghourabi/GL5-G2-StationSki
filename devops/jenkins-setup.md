@@ -12,6 +12,20 @@ Validation ran inside the Jenkins container with the actual Docker socket, Java 
 
 Recreate the local environment after pulling configuration changes: `docker compose -f compose.devops.yml up -d jenkins`. This also starts its isolated CI database. Only one job should use that shared CI database at a time; separate jobs require separate databases.
 
+## Memory and Nexus availability
+
+Build #5 passed SonarQube's quality gate but could not resolve `nexus` because Docker had OOM-killed the container (exit 137). Nexus now uses a smaller **local-lab-only** JVM heap (512 MiB initial, 1 GiB maximum, 512 MiB direct memory). This is not production sizing or a guarantee against future memory pressure.
+
+Before CI, stop optional workloads and start the required services from the project root:
+
+```bash
+docker compose -f compose.app.yml stop
+docker compose -f compose.devops.yml stop grafana prometheus
+docker compose -f compose.devops.yml up -d jenkins nexus sonarqube
+```
+
+Wait for Nexus at http://localhost:8081 and SonarQube at http://localhost:9000. Keep monitoring memory, since team Testcontainers suites start additional MySQL containers. Configuration recreation keeps the existing Nexus data volume. Nexus startup and hostname resolution from Jenkins were verified after recovery. Rerun the complete job; subsequent Docker stages still need verification.
+
 ## Before running
 
 - Docker Desktop currently has only 4.2 GiB RAM. Increase its allocation (for example 8 GiB if host memory permits), or use a larger environment before starting Jenkins + Nexus + SonarQube and Maven concurrently. Do not assume all tools will fit.

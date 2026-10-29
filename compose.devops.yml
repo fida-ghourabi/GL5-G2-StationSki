@@ -10,8 +10,13 @@ services:
     image: stationski-jenkins:local
     ports:
       - "127.0.0.1:8080:8080"
+    # Local lab only: jobs can control the Docker host through this socket.
+    # This Docker Desktop socket is owned by GID 0; recheck on another host.
+    group_add:
+      - "0"
     volumes:
       - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
 
   sonar-db:
     image: postgres:16

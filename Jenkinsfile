@@ -1,5 +1,5 @@
 // Local coursework baseline. Separate build agents are preferred outside this lab.
-// Docker image build/deployment stages will be added in later course phases.
+// Docker socket access is trusted-lab only. Do not build untrusted PRs here.
 pipeline {
     agent any
     tools { maven 'Maven3' }
@@ -9,6 +9,7 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
     }
     environment {
+        IMAGE_REPOSITORY = 'yassine1234/stationski-backend'
         JAVA_HOME = '/opt/java17'
         PATH = "/opt/java17/bin:${env.PATH}"
     }
@@ -48,6 +49,25 @@ pipeline {
                     dir('backend') {
                         sh 'mvn -B -s nexus-settings.xml deploy -DskipTests -Dnexus.url=http://nexus:8081'
                     }
+                }
+            }
+        }
+        stage('BUILDING OUR IMAGE') {
+            steps {
+                sh 'docker version'
+                sh 'docker build -t "$IMAGE_REPOSITORY:jenkins-$BUILD_NUMBER" backend'
+            }
+        }
+        stage('PUSH TO DOCKER HUB') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_TOKEN')]) {
+                    sh '''
+                        set +x
+                        export DOCKER_CONFIG="$(mktemp -d)"
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+                        printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+                        docker push "$IMAGE_REPOSITORY:jenkins-$BUILD_NUMBER"
+                    '''
                 }
             }
         }

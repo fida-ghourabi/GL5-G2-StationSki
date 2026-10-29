@@ -1,6 +1,6 @@
 # Jenkins baseline pipeline (Phase 11)
 
-Prepared: root Jenkinsfile, Maven3 tool, Java 17 build runtime in the custom Jenkins image (controller remains Java 21), H2 tests through `crud-test`, Sonar quality gate wait, authenticated Nexus publish and archived test/coverage/JAR results. Docker and cloud deployment are later phases.
+Prepared: root Jenkinsfile, Maven3 tool, Java 17 build runtime in the custom Jenkins image (controller remains Java 21), H2 tests through `crud-test`, Sonar quality gate wait, authenticated Nexus publish and archived test/coverage/JAR results. Docker build/push stages are now included; cloud deployment remains a later phase.
 
 Required credentials: Secret text `sonarqube-token`; username/password `nexus-credentials`. No real credentials belong in Git.
 
@@ -23,4 +23,17 @@ Required credentials: Secret text `sonarqube-token`; username/password `nexus-cr
 
 The addresses `http://sonarqube:9000` and `http://nexus:8081` work inside the Compose network, unlike host `localhost` URLs. The Maven Nexus URL remains localhost by default for manual host runs and is overridden only in Jenkins.
 
-Validation performed: Java 17 custom image built and installed; Maven `clean verify -Dspring.profiles.active=crud-test` passed locally with all 26 tests using H2. The complete Jenkins pipeline and its credentials have not yet been verified in a job.
+Validation performed: Java 17 custom image built and installed; Maven `clean verify -Dspring.profiles.active=crud-test` passed locally with all 26 tests using H2. The baseline Jenkins run succeeded. The new Docker stages still require a full Jenkins run.
+
+## Enable Docker Hub push
+
+1. In Docker Hub, create a personal access token with read/write permission for your repository. Never paste it into Git or chat.
+2. Jenkins → Manage Jenkins → Credentials → System → Global → Add Credentials: **Username with password**, username `yassine1234`, password = Docker Hub token, ID **`dockerhub`**.
+3. The Docker CLI is installed in the custom Jenkins image. Compose mounts the host socket with supplementary GID `0`, verified for this Docker Desktop instance. This grants host-wide Docker control; use only trusted jobs, not untrusted PRs. A separate agent/daemon is preferred outside this local lab.
+4. Commit/push the updated Jenkinsfile, Compose file, Jenkins Dockerfile, backend Dockerfile and `.dockerignore`, and documentation to the configured feature branch. No push is performed automatically.
+5. The Jenkins container was already rebuilt/recreated locally. Elsewhere run `docker compose -f compose.devops.yml up -d --build jenkins`.
+6. Build Now. Verify **BUILDING OUR IMAGE** and **PUSH TO DOCKER HUB** succeed. The pushed tag is `yassine1234/stationski-backend:jenkins-BUILD_NUMBER` (e.g. `jenkins-2`). No container deployment occurs in this stage.
+
+Login uses `--password-stdin` and a temporary Docker config directory removed afterward. The Docker Hub token is injected only in the push stage. Neither desktop credentials nor `manual-test` are overwritten. Local image cleanup is not automatic; avoid broad Docker prune commands because other project images/volumes share the daemon.
+
+Verified: Docker client/server communication and an image smoke build from inside Jenkins succeeded. Automated authenticated push is pending the credential and job run.

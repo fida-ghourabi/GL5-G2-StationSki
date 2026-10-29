@@ -1,0 +1,34 @@
+# Isolated local demo: does not use your host skidb database.
+name: stationski-app
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: skidb
+      MYSQL_USER: ski_app
+      MYSQL_PASSWORD: local_demo_password
+      MYSQL_ROOT_PASSWORD: local_demo_root_password
+    volumes:
+      - app_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D skidb -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  backend:
+    image: stationski-backend:local
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://db:3306/skidb?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8
+      DB_USERNAME: ski_app
+      DB_PASSWORD: local_demo_password
+      SPRING_PROFILES_ACTIVE: local
+    ports:
+      - "127.0.0.1:8088:8087"
+volumes:
+  app_mysql_data:

@@ -92,7 +92,7 @@ Notes:
 - The full stack needs several GiB of RAM. If memory is tight, start a subset, for example `docker compose -f compose.devops.yml up -d sonarqube` (also starts its database).
 - SonarQube may require a higher `vm.max_map_count` in the Docker engine host/VM. This host currently has `1048576`; inspect SonarQube logs if it fails to start.
 - Prometheus initially scrapes only itself. In Grafana, use `http://prometheus:9090` as the Prometheus data-source URL. Application monitoring comes later.
-- Jenkins is pinned to a verified image digest running Jenkins 2.580.1 / Java 21. The application still uses Java 17 separately. Jenkins is not yet configured with Maven/Docker agents or a pipeline. No host Docker socket is mounted.
+- Jenkins is pinned to a verified image digest running Jenkins 2.580.1 / Java 21. The application still uses Java 17 separately. Jenkins uses the built-in node for this lab. The host Docker socket is mounted with its GID as a supplementary group: trusted jobs can control the entire Docker host. Do not build untrusted contributions.
 - Before the Jenkins upgrade, its stopped data volume was archived privately under `~/.local/state/stationski-backups/` (outside Git). Backups contain credentials: keep them private. After any upgrade, review **Manage Jenkins → Plugins → Updates** and security advisories; upgrading core does not automatically update installed plugins.
 - Prometheus configuration is copied into a small local image to avoid external-drive bind-mount problems with Docker Desktop. After editing `devops/prometheus.yml`, run `docker compose -f compose.devops.yml up -d --build prometheus`.
 - Image tags are moving tags; pin tested versions before making the final CI environment reproducible. All six containers have been observed running; Prometheus readiness was verified. Other tools still require their initial setup.
@@ -122,7 +122,35 @@ MySQL must be running for the existing context test. This compiles, tests, packa
 
 ## Jenkins pipeline (Phase 11)
 
-See [Jenkins setup](devops/jenkins-setup.md) for memory prerequisites, required credentials and the feature-branch Pipeline job configuration. The root `Jenkinsfile` builds/tests with Java 17, analyzes with SonarQube and publishes to Nexus. Full pipeline execution is not yet verified.
+See [Jenkins setup](devops/jenkins-setup.md) for memory prerequisites, required credentials and the feature-branch Pipeline job configuration. The root `Jenkinsfile` builds/tests with Java 17, analyzes with SonarQube and publishes to Nexus. The baseline pipeline passed in Jenkins. Docker build/push stages are added; their complete Jenkins run still needs verification.
+
+## Backend Docker image (Phase 12 — local part)
+
+The backend image runs as a non-root user on Java 17. This demo starts a **separate MySQL database**, not your host `skidb`. Angular is not included and its existing proxy still points to port 8087, not this demo's port 8088.
+
+From the project root, build a fresh JAR with tests:
+
+```bash
+cd backend
+export JAVA_HOME="$HOME/.jdks/temurin-17"
+export PATH="$JAVA_HOME/bin:$PATH"
+mvn clean package -Dspring.profiles.active=crud-test
+cd ..
+docker compose -f compose.app.yml up -d --build
+```
+
+The Dockerfile copies the packaged JAR; rerun Maven after changing Java source. `.dockerignore` excludes source credentials and other files from the build context.
+
+- Swagger: http://localhost:8088/stationSki/swagger-ui/index.html
+- API: http://localhost:8088/stationSki
+- Check: `docker compose -f compose.app.yml ps`
+- Logs: `docker compose -f compose.app.yml logs --tail=50 backend`
+- Image evidence: `docker image ls stationski-backend`
+- Stop: `docker compose -f compose.app.yml down`
+
+Database data is retained in its own named volume. Do not use `down -v` unless you intend to erase that demo data. The hard-coded credentials in this isolated demo are local-only placeholders; MySQL has no published host port. The `local` profile synchronizes tables. Do not reuse this configuration in production.
+
+Verified locally: Maven build/tests pass, MySQL is healthy, backend OpenAPI returns HTTP 200. Save screenshots of the running containers/image and Swagger. The manual image was pushed to `yassine1234/stationski-backend:manual-test`. Jenkins now builds/pushes `jenkins-BUILD_NUMBER` tags; add its `dockerhub` credential and push the updated files before running it. See the Jenkins setup guide. Automated push still needs verification.
 
 ## Troubleshooting
 

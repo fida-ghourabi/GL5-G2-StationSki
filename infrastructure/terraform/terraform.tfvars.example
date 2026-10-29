@@ -1,0 +1,15 @@
+aws_region         = "us-east-1"
+project_name       = "stationski"
+environment        = "dev"
+cluster_name       = "stationski-dev"
+kubernetes_version = "1.33"
+
+node_instance_types = ["t3.small"]
+node_min_size       = 1
+node_desired_size   = 1
+node_max_size       = 2
+
+db_name           = "skidb"
+db_username       = "stationski_admin"
+db_instance_class = "db.t3.micro"
+db_engine_version = "8.0.39"

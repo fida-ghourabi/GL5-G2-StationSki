@@ -43,7 +43,8 @@ module "eks" {
 
   cluster_endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = false
-  kms_key_administrators                   = [data.aws_caller_identity.current.arn]
+  create_kms_key                           = false
+  cluster_encryption_config                = {}
 
   access_entries = {
     terraform = {

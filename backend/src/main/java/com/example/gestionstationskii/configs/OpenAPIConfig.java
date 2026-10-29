@@ -3,6 +3,8 @@ package com.example.gestionstationskii.configs;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import org.springdoc.core.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,33 +46,41 @@ public class OpenAPIConfig {
     public org.springdoc.core.customizers.OpenApiCustomiser parameterDescriptions() {
         return api -> {
             if (api.getPaths() == null) return;
-            api.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
-                if (operation.getParameters() == null) return;
-                operation.getParameters().forEach(parameter -> {
-                    if (parameter.getDescription() != null) return;
-                    String name = parameter.getName();
-                    if (name == null) return;
-                    String description;
-                    switch (name) {
-                        case "from": description = "Début inclus de la période, au format ISO"; break;
-                        case "to": description = "Fin exclue de la période, au format ISO"; break;
-                        case "asOf": description = "Date de référence incluse, au format ISO yyyy-MM-dd"; break;
-                        case "page": description = "Index de page à partir de zéro"; break;
-                        case "size": description = "Nombre de résultats par page, de 1 à 100"; break;
-                        case "name": description = "Fragment du nom ou du prénom, insensible à la casse"; break;
-                        case "city": description = "Fragment du nom de ville, insensible à la casse"; break;
-                        case "level": description = "Niveau du cours, entier strictement positif"; break;
-                        case "date1": description = "Date de début inclusive (yyyy-MM-dd)"; break;
-                        case "date2": description = "Date de fin inclusive (yyyy-MM-dd)"; break;
-                        default:
-                            description = name.toLowerCase(java.util.Locale.ROOT).contains("id") || name.startsWith("num")
-                                    ? "Identifiant strictement positif de la ressource référencée"
-                                    : "Valeur parmi les choix documentés dans le schéma";
-                    }
-                    parameter.setDescription(description);
-                });
-            }));
+            api.getPaths().values().forEach(path ->
+                    path.readOperations().forEach(this::describeOperationParameters));
         };
+    }
+
+    private void describeOperationParameters(Operation operation) {
+        if (operation.getParameters() == null) return;
+        operation.getParameters().forEach(this::describeParameter);
+    }
+
+    private void describeParameter(Parameter parameter) {
+        if (parameter.getDescription() != null || parameter.getName() == null) return;
+        parameter.setDescription(descriptionFor(parameter.getName()));
+    }
+
+    private String descriptionFor(String name) {
+        switch (name) {
+            case "from": return "Début inclus de la période, au format ISO";
+            case "to": return "Fin exclue de la période, au format ISO";
+            case "asOf": return "Date de référence incluse, au format ISO yyyy-MM-dd";
+            case "page": return "Index de page à partir de zéro";
+            case "size": return "Nombre de résultats par page, de 1 à 100";
+            case "name": return "Fragment du nom ou du prénom, insensible à la casse";
+            case "city": return "Fragment du nom de ville, insensible à la casse";
+            case "level": return "Niveau du cours, entier strictement positif";
+            case "date1": return "Date de début inclusive (yyyy-MM-dd)";
+            case "date2": return "Date de fin inclusive (yyyy-MM-dd)";
+            default: return isIdentifier(name)
+                    ? "Identifiant strictement positif de la ressource référencée"
+                    : "Valeur parmi les choix documentés dans le schéma";
+        }
+    }
+
+    private boolean isIdentifier(String name) {
+        return name.toLowerCase(java.util.Locale.ROOT).contains("id") || name.startsWith("num");
     }
 
 

@@ -30,7 +30,7 @@ public class Registration implements Serializable {
 	@org.hibernate.annotations.ColumnDefault("false")
 	boolean cancelled;
 	@ManyToOne
-	PlanningSlot planningSlot;
+	private PlanningSlot planningSlot;
 
 	@JsonIgnore
 	@ManyToOne

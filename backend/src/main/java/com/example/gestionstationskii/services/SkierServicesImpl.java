@@ -15,6 +15,7 @@ import java.util.List;
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class SkierServicesImpl implements ISkierServices {
+    private static final String SKIER_RESOURCE = "Skieur";
 
     private final ISkierRepository skierRepository;
 
@@ -65,7 +66,7 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public Skier assignSkierToSubscription(Long numSkier, Long numSubscription) {
         Checks.id(numSkier); Checks.id(numSubscription);
-        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         Subscription subscription = subscriptionRepository.lockById(numSubscription).orElseThrow(() -> BusinessException.missing("Abonnement"));
         Skier owner = skierRepository.findBySubscription(subscription);
         if (owner != null) throw BusinessException.conflict("Abonnement déjà affecté");
@@ -101,14 +102,14 @@ public class SkierServicesImpl implements ISkierServices {
     public Skier retrieveSkier(Long numSkier) {
         return logged("read", numSkier, () -> {
             Checks.id(numSkier);
-            return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+            return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         });
     }
 
     @Override
     public Skier assignSkierToPiste(Long numSkieur, Long numPiste) {
         Checks.id(numSkieur); Checks.id(numPiste);
-        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         Piste piste = pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
         if (skier.getPistes() == null) skier.setPistes(new HashSet<>());
         if (!skier.getPistes().add(piste)) throw BusinessException.conflict("Skieur déjà affecté à cette piste");
@@ -146,7 +147,7 @@ public class SkierServicesImpl implements ISkierServices {
         return logged("update", input == null ? null : input.getNumSkier(), () -> {
         validate(input);
         Checks.id(input.getNumSkier());
-        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         current.setFirstName(input.getFirstName()); current.setLastName(input.getLastName());
         boolean profileChanged = !java.util.Objects.equals(current.getCity(), input.getCity());
         current.setCity(input.getCity()); current.setDateOfBirth(input.getDateOfBirth());

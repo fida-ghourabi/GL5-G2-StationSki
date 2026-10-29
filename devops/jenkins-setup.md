@@ -4,6 +4,10 @@ Prepared: root Jenkinsfile, Maven3 tool, Java 17 build runtime in the custom Jen
 
 Required credentials: Secret text `sonarqube-token`; username/password `nexus-credentials`. No real credentials belong in Git.
 
+## Team integration warning
+
+This personal branch now includes the latest team `develop` tests. The earlier 26-test CI success predates that integration. Some teammates' integration tests use MySQL/Testcontainers and the `test` profile; do not assume `crud-test` alone isolates every test. The combined full CI suite requires a fresh review of its test database/container settings before the next build. The existing team JaCoCo report runs at `verify` with a registration coverage gate; keep this configuration rather than duplicating the plugin.
+
 ## Before running
 
 - Docker Desktop currently has only 4.2 GiB RAM. Increase its allocation (for example 8 GiB if host memory permits), or use a larger environment before starting Jenkins + Nexus + SonarQube and Maven concurrently. Do not assume all tools will fit.
@@ -17,7 +21,7 @@ Required credentials: Secret text `sonarqube-token`; username/password `nexus-cr
 2. Pipeline definition: Pipeline script from SCM.
 3. SCM: Git. Repository: `https://github.com/fida-ghourabi/GL5-G2-StationSki.git`.
 4. Add Git credentials only if the repository requires authentication.
-5. Branch specifier: `*/feat/skip-piste-tests` (verify this is still your intended branch).
+5. Branch specifier: `*/feature/yassine-mathlouthi`.
 6. Script path: `Jenkinsfile`. Save → Build Now.
 7. Inspect Console Output and stages. A passing run must include tests, successful Sonar processing/quality gate, and Nexus upload. Capture evidence only after a successful run.
 

@@ -84,6 +84,9 @@ pipeline {
 
         TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
 
+        AWS_REGION = 'us-east-1'
+        TERRAFORM_DIR = 'infrastructure/terraform'
+
     }
 
     stages {
@@ -482,6 +485,98 @@ pipeline {
                 }
             }
         }
+
+        /*
+         * ============================================================
+         * Stage 11 : SETUP TERRAFORM
+         * ============================================================
+         *
+         * Regroupe le cycle Terraform comme dans le pipeline de
+         * référence : format, init, validate, plan et apply.
+         *
+         * Une approbation humaine est conservée entre plan et apply.
+         */
+        stage('SETUP TERRAFORM') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform fmt -check -recursive'
+                    sh 'terraform init -input=false'
+                    sh 'terraform validate'
+
+                    withCredentials([
+                        file(
+                            credentialsId: 'aws-credentials',
+                            variable: 'AWS_CREDENTIALS_FILE'
+                        )
+                    ]) {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="$AWS_REGION"
+                            export TF_IN_AUTOMATION="true"
+                            terraform plan -input=false -out=tfplan
+                        '''
+                    }
+
+                    timeout(time: 15, unit: 'MINUTES') {
+                        input(
+                            message: 'Le plan Terraform a-t-il été vérifié et peut-il être appliqué sur AWS ?',
+                            ok: 'Appliquer le plan'
+                        )
+                    }
+
+                    withCredentials([
+                        file(
+                            credentialsId: 'aws-credentials',
+                            variable: 'AWS_CREDENTIALS_FILE'
+                        )
+                    ]) {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="$AWS_REGION"
+                            export TF_IN_AUTOMATION="true"
+                            terraform apply -input=false tfplan
+                        '''
+                    }
+                }
+            }
+        }
+
+        /*
+         * ============================================================
+         * Stage 12 : UPDATE KUBECONFIG
+         * ============================================================
+         *
+         * Configure kubectl pour le cluster créé par Terraform.
+         */
+        stage('UPDATE KUBECONFIG') {
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDENTIALS_FILE'
+                    )
+                ]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="$AWS_REGION"
+                            export KUBECONFIG="$WORKSPACE/.kube/config"
+                            mkdir -p "$WORKSPACE/.kube"
+                            cluster_name="$(terraform output -raw eks_cluster_name)"
+                            aws eks update-kubeconfig \
+                                --region "$AWS_REGION" \
+                                --name "$cluster_name" \
+                                --kubeconfig "$KUBECONFIG"
+                            kubectl get nodes
+                        '''
+                    }
+                }
+            }
+        }
+
     }
 
     /*

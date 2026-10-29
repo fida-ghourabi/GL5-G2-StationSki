@@ -42,19 +42,19 @@ variable "node_instance_types" {
 variable "node_min_size" {
   description = "Minimum number of EKS worker nodes."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "node_desired_size" {
   description = "Desired number of EKS worker nodes."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "node_max_size" {
   description = "Maximum number of EKS worker nodes."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "db_name" {

@@ -607,7 +607,7 @@ pipeline {
                         DB_PASS=$(echo "$SECRET_JSON" | jq -r .password)
 
                         # 3. Namespace
-                        kubectl apply -f k8s/backend/namespace.yaml
+                        kubectl apply -f k8s/namespace.yaml
 
                         # 4. Secret Kubernetes : DB_URL, DB_USERNAME, DB_PASSWORD
                         kubectl -n stationski create secret generic db-credentials \

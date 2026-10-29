@@ -1351,7 +1351,7 @@ pipeline {
                             helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
                               --namespace monitoring --create-namespace \
                               -f k8s/monitoring/values.yaml \
-                              --set grafana.adminPassword="$GRAFANA_PASS" \
+                              --set-string grafana.adminPassword="$GRAFANA_PASS" \
                               --wait --timeout 15m
 
                             kubectl -n monitoring get pods

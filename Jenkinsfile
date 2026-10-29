@@ -828,14 +828,24 @@ pipeline {
                             printf 'Frontend URL: http://%s\\n' "$frontend_host"
                             command -v curl >/dev/null 2>&1 || { echo 'curl est requis pour le smoke test EKS.' >&2; exit 1; }
                             api_url="http://$frontend_host/stationSki/registration/skier/1"
+
+                            # Étape A : attendre que l'adresse AWS soit résolvable (jusqu'à 10 min)
+                            for attempt in $(seq 1 40); do
+                                getent hosts "$frontend_host" >/dev/null 2>&1 && break
+                                echo "DNS pas encore prêt ($attempt/40)..."
+                                sleep 15
+                            done
+
+                            # Étape B : tester l'API (jusqu'à 5 min)
                             api_status=""
-                            for attempt in $(seq 1 12); do
+                            for attempt in $(seq 1 30); do
                                 api_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
                                     --connect-timeout 5 --max-time 15 "$api_url" || true)"
                                 case "$api_status" in
                                     2??|404) break ;;
                                 esac
-                                sleep 5
+                                echo "API pas prête (HTTP $api_status), tentative $attempt/30..."
+                                sleep 10
                             done
                             case "$api_status" in
                                 2??|404) printf 'Smoke test API réussi : HTTP %s\n' "$api_status" ;;

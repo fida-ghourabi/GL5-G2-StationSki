@@ -27,6 +27,18 @@ variable "cluster_name" {
   default     = "stationski-dev"
 }
 
+variable "cluster_iam_role_arn" {
+  description = "Existing IAM role ARN used by the EKS control plane."
+  type        = string
+  default     = "arn:aws:iam::642179879357:role/LabRole"
+}
+
+variable "node_iam_role_arn" {
+  description = "Existing IAM role ARN used by the EKS managed node group."
+  type        = string
+  default     = "arn:aws:iam::642179879357:role/LabRole"
+}
+
 variable "kubernetes_version" {
   description = "EKS Kubernetes version."
   type        = string
@@ -78,5 +90,5 @@ variable "db_instance_class" {
 variable "db_engine_version" {
   description = "Supported MySQL engine version for RDS."
   type        = string
-  default     = "8.0.39"
+  default     = "8.0.46"
 }

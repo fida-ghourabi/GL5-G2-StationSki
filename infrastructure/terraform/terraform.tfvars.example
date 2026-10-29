@@ -3,6 +3,8 @@ project_name       = "stationski"
 environment        = "dev"
 cluster_name       = "stationski-dev"
 kubernetes_version = "1.33"
+cluster_iam_role_arn = "arn:aws:iam::642179879357:role/LabRole"
+node_iam_role_arn    = "arn:aws:iam::642179879357:role/LabRole"
 
 node_instance_types = ["t3.small"]
 node_min_size       = 2
@@ -12,4 +14,4 @@ node_max_size       = 3
 db_name           = "skidb"
 db_username       = "stationski_admin"
 db_instance_class = "db.t3.micro"
-db_engine_version = "8.0.39"
+db_engine_version = "8.0.46"

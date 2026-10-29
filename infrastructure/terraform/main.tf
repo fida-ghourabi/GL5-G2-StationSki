@@ -44,6 +44,8 @@ module "eks" {
   cluster_endpoint_public_access = true
   create_kms_key                 = false
   cluster_encryption_config      = []
+  create_iam_role                = false
+  iam_role_arn                   = var.cluster_iam_role_arn
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
@@ -63,9 +65,11 @@ module "eks" {
 
   eks_managed_node_groups = {
     application = {
-      name           = "${var.project_name}-${var.environment}"
-      instance_types = var.node_instance_types
-      capacity_type  = "ON_DEMAND"
+      name            = "${var.project_name}-${var.environment}"
+      instance_types  = var.node_instance_types
+      capacity_type   = "ON_DEMAND"
+      create_iam_role = false
+      iam_role_arn    = var.node_iam_role_arn
 
       min_size     = var.node_min_size
       desired_size = var.node_desired_size

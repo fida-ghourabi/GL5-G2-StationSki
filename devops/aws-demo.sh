@@ -109,7 +109,7 @@ case "$MODE" in
         echo "Cannot verify disk $volume deletion" >&2; exit 1
       fi
     done
-    rm -f "$STATE_DIR/apply-started" "$STATE_DIR/demo.tfplan" "$STATE_DIR/destroy.tfplan"
+    rm -f "$STATE_DIR/apply-started" "$STATE_DIR/cleanup-owner" "$STATE_DIR/demo.tfplan" "$STATE_DIR/destroy.tfplan"
     echo 'Verified demo cleanup: empty managed state, cluster absent, recorded workers/disks removed.'
     ;;
   *) echo "Unknown operation: $MODE" >&2; exit 2 ;;

@@ -18,7 +18,6 @@ pipeline {
         IMAGE_REPOSITORY = 'yassine1234/stationski-backend'
         AWS_EXPECTED_ACCOUNT = '085397751671'
         AWS_DEMO_STATE_DIR = "${env.JENKINS_HOME}/stationski-aws-demo"
-        AWS_APPLY_STARTED = 'false'
         JAVA_HOME = '/opt/java17'
         PATH = "/opt/java17/bin:${env.PATH}"
     }
@@ -99,7 +98,11 @@ pipeline {
         stage('AWS TERRAFORM APPLY') {
             when { expression { params.AWS_DEMO } }
             steps {
-                script { env.AWS_APPLY_STARTED = 'true' }
+                script {
+                    // Persistent per-build guard; declarative environment values cannot
+                    // reliably be changed by assigning env.X from a script block.
+                    writeFile file: "${env.AWS_DEMO_STATE_DIR}/cleanup-owner", text: env.BUILD_TAG
+                }
                 withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
                     withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}"]) {
                         sh 'bash devops/aws-demo.sh apply'
@@ -131,7 +134,9 @@ pipeline {
     post {
         always {
             script {
-                if (env.AWS_APPLY_STARTED == 'true') {
+                if (params.AWS_DEMO &&
+                    fileExists("${env.AWS_DEMO_STATE_DIR}/cleanup-owner") &&
+                    readFile("${env.AWS_DEMO_STATE_DIR}/cleanup-owner").trim() == env.BUILD_TAG) {
                     timeout(time: 60, unit: 'MINUTES') {
                         withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
                             withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}"]) {

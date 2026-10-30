@@ -4,6 +4,10 @@
 
 Normal builds keep `AWS_DEMO=false` and do not access AWS. Enabling it is explicitly billable. The Jenkinsfile adds plan → manual cost approval → apply → Kubernetes deployment → screenshot window → cleanup in `post { always { ... } }`. The pushed image from that exact build is deployed. The screenshot window is at most 15 minutes; timeout aborts the build and starts cleanup. Provisioning itself and cleanup also take billable time.
 
+## Cleanup guard correction
+
+Build #9 timed out during the screenshot input but skipped cleanup because the original guard tried to modify a declarative environment variable. It now writes a persistent `cleanup-owner` marker containing `BUILD_TAG` before apply; post actions check that marker instead. Verified cleanup removes the marker, while failures preserve it for recovery. Do not rerun the old revision. Recovery was initiated against the Jenkins-side state; always check the live AWS result rather than assuming an aborted build cleaned up.
+
 ## 1. Rebuild Jenkins tools
 
 From project root:

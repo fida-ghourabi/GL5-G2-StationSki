@@ -90,17 +90,21 @@ if 'plan' in args:
         self.assertNotIn(" apply ", self.calls())
 
     def test_cleanup_continues_when_kubernetes_unreachable(self):
+        (self.state / "cleanup-owner").write_text("test-build")
         result = self.run_mode("cleanup")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("plan -destroy", self.calls())
         self.assertIn("apply -input=false", self.calls())
         self.assertIn("Verified demo cleanup", result.stdout)
+        self.assertFalse((self.state / "cleanup-owner").exists())
 
     def test_cleanup_does_not_claim_success_on_auth_failure(self):
         self.env["MOCK_CLUSTER_ERROR"] = "ExpiredTokenException"
+        (self.state / "cleanup-owner").write_text("test-build")
         result = self.run_mode("cleanup")
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("Verified demo cleanup", result.stdout)
+        self.assertTrue((self.state / "cleanup-owner").exists())
 
 
 if __name__ == "__main__":

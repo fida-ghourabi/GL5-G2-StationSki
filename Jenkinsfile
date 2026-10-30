@@ -64,8 +64,6 @@ def commonMailRows() {
         ['Durée', duration]
     ]
 }
-
-
 // =======================================================
 
 pipeline {
@@ -95,9 +93,9 @@ pipeline {
         string(name: 'SONAR_URL', defaultValue: 'http://sonarqube:9000', description: 'URL SonarQube joignable depuis Jenkins.')
         string(name: 'NEXUS_MAVEN_URL', defaultValue: 'http://nexus:8081/repository/maven-snapshots/', description: 'URL du dépôt Maven snapshots Nexus.')
         choice(name: 'NEXUS_TARGET', choices: ['snapshot', 'release', 'both'], description: 'Type de publication Nexus : snapshot, release ou les deux.')
-        string(name: 'RELEASE_VERSION', defaultValue: '1.0.0', description: 'Version utilisée pour la release Nexus (sans -SNAPSHOT).')
+        string(name: 'RELEASE_VERSION', defaultValue: '1.0', description: 'Début de version pour la release Nexus. Le numéro de build est ajouté automatiquement : 1.0 donne 1.0.<numéro du build> (ex. 1.0.41).')
         string(name: 'NEXUS_RELEASE_URL', defaultValue: 'http://nexus:8081/repository/maven-releases/', description: 'URL du dépôt Maven releases Nexus.')
-        string(name: 'NOTIFY_EMAIL', defaultValue: 'hajerbennacer03@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
+        string(name: 'NOTIFY_EMAIL', defaultValue: 'ton.email@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
     }
 
     environment {
@@ -118,6 +116,8 @@ pipeline {
                 checkout scm
                 script {
                     env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    // Version release Nexus unique à chaque build : <RELEASE_VERSION>.<numéro de build>
+                    env.NEXUS_RELEASE_VERSION = "${params.RELEASE_VERSION}.${env.BUILD_NUMBER}"
 
                     List startRows = commonMailRows()
                     startRows.add(['Tests + Sonar', "${params.RUN_SONAR}"])
@@ -200,14 +200,14 @@ pipeline {
                             fi
 
                             if [ "$NEXUS_TARGET" = "release" ] || [ "$NEXUS_TARGET" = "both" ]; then
-                                echo "=== Publication RELEASE $RELEASE_VERSION ==="
+                                echo "=== Publication RELEASE $NEXUS_RELEASE_VERSION ==="
                                 ./mvnw -B -s "$settings_file" org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file \\
                                   -DrepositoryId=stationski-nexus \\
                                   -Durl="$NEXUS_RELEASE_URL" \\
                                   -Dfile="$JAR" \\
                                   -DgroupId=com.example \\
                                   -DartifactId=gestion-station-skii \\
-                                  -Dversion="$RELEASE_VERSION" \\
+                                  -Dversion="$NEXUS_RELEASE_VERSION" \\
                                   -Dpackaging=jar \\
                                   -DgeneratePom=true
                             fi
@@ -480,7 +480,7 @@ pipeline {
                 List rows = commonMailRows()
                 rows.add(['Image backend', "${env.BACKEND_IMAGE}:${env.IMAGE_TAG}"])
                 rows.add(['Image frontend', "${env.FRONTEND_IMAGE}:${env.IMAGE_TAG}"])
-                rows.add(['Nexus', "${params.NEXUS_TARGET}"])
+                rows.add(['Nexus', params.NEXUS_TARGET == 'snapshot' ? 'snapshot' : "${params.NEXUS_TARGET} (release ${env.NEXUS_RELEASE_VERSION})"])
                 rows.add(['Déployé sur EKS', params.DEPLOY_TO_EKS ? 'Oui' : 'Non'])
                 rows.add(['Rappel', "L'infrastructure AWS n'est pas détruite (coûts)"])
                 sendMail("✅ SUCCÈS : ${env.JOB_NAME} #${env.BUILD_NUMBER}",

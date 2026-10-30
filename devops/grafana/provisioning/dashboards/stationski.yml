@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: StationSki
+    orgId: 1
+    folder: StationSki
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /etc/grafana/stationski-dashboards

@@ -91,7 +91,7 @@ Notes:
 - All published ports are restricted to localhost. The database password in Compose is a local-lab placeholder, not a production credential.
 - The full stack needs several GiB of RAM. If memory is tight, start a subset, for example `docker compose -f compose.devops.yml up -d sonarqube` (also starts its database).
 - SonarQube may require a higher `vm.max_map_count` in the Docker engine host/VM. This host currently has `1048576`; inspect SonarQube logs if it fails to start.
-- Prometheus initially scrapes only itself. In Grafana, use `http://prometheus:9090` as the Prometheus data-source URL. Application monitoring comes later.
+- Prometheus now scrapes the local demo backend through the monitoring overlay. Grafana's data source/dashboard are provisioned automatically. See [local monitoring](devops/monitoring.md).
 - Jenkins is pinned to a verified image digest running Jenkins 2.580.1 / Java 21. The application still uses Java 17 separately. Jenkins uses the built-in node for this lab. The host Docker socket is mounted with its GID as a supplementary group: trusted jobs can control the entire Docker host. Do not build untrusted contributions.
 - Before the Jenkins upgrade, its stopped data volume was archived privately under `~/.local/state/stationski-backups/` (outside Git). Backups contain credentials: keep them private. After any upgrade, review **Manage Jenkins → Plugins → Updates** and security advisories; upgrading core does not automatically update installed plugins.
 - Prometheus configuration is copied into a small local image to avoid external-drive bind-mount problems with Docker Desktop. After editing `devops/prometheus.yml`, run `docker compose -f compose.devops.yml up -d --build prometheus`.
@@ -155,6 +155,10 @@ Verified locally: Maven build/tests pass, MySQL is healthy, backend OpenAPI retu
 ## Optional AWS pipeline demo
 
 See [AWS pipeline instructions](devops/aws-pipeline.md). AWS stages are **disabled by default** and require a separate Secret-file credential, explicit plan/cost approval, and a screenshot window followed by automatic cleanup. Cleanup is best-effort: expired credentials/controller failures require manual recovery. No new AWS infrastructure was created while adding this automation. The earlier manual AWS demo was destroyed and verified.
+
+## Application monitoring (Phase 15)
+
+Configured locally; no AWS costs. Open **http://localhost:3000/d/stationski-local** and **http://localhost:9090/targets**. See [monitoring instructions](devops/monitoring.md) for start/stop commands, sample traffic, tests and screenshots. SonarQube was stopped to save RAM; restart it before CI.
 
 ## Troubleshooting
 

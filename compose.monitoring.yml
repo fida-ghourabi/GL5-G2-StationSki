@@ -1,0 +1,12 @@
+# Apply together with compose.app.yml AFTER starting Prometheus/Grafana.
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: local,monitoring
+    networks:
+      - default
+      - monitoring
+networks:
+  monitoring:
+    external: true
+    name: stationski-monitoring

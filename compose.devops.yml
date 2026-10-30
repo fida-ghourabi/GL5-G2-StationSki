@@ -95,17 +95,27 @@ services:
       context: ./devops
       dockerfile: Dockerfile.prometheus
     image: stationski-prometheus:local
+    networks:
+      - default
+      - monitoring
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
       - prometheus_data:/prometheus
 
   grafana:
-    image: grafana/grafana:latest
+    build:
+      context: ./devops
+      dockerfile: Dockerfile.grafana
+    image: stationski-grafana:local
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+
+networks:
+  monitoring:
+    name: stationski-monitoring
 
 volumes:
   jenkins_data:

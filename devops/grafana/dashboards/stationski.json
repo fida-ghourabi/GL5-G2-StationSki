@@ -1,0 +1,56 @@
+{
+  "uid": "stationski-local",
+  "title": "StationSki - Local Application Monitoring",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["stationski", "coursework", "local"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "title": "Backend scrape availability (1 = UP)", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "expr": "up{job=\"stationski-backend\"}", "instant": true}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "background"}
+    },
+    {
+      "id": 2, "title": "JVM uptime", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "targets": [{"refId": "A", "expr": "process_uptime_seconds{job=\"stationski-backend\"}", "instant": true}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 3, "title": "HTTP request rate (excluding Actuator)", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "targets": [{"refId": "A", "expr": "sum(rate(http_server_requests_seconds_count{job=\"stationski-backend\",uri!~\".*actuator.*\"}[2m]))", "legendFormat": "requests/s"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "min": 0}, "overrides": []}
+    },
+    {
+      "id": 4, "title": "Mean HTTP response time (excluding Actuator)", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "targets": [{"refId": "A", "expr": "sum(rate(http_server_requests_seconds_sum{job=\"stationski-backend\",uri!~\".*actuator.*\"}[2m])) / sum(rate(http_server_requests_seconds_count{job=\"stationski-backend\",uri!~\".*actuator.*\"}[2m]))", "legendFormat": "mean latency"}],
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []}
+    },
+    {
+      "id": 5, "title": "JVM heap memory", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "targets": [{"refId": "A", "expr": "sum(jvm_memory_used_bytes{job=\"stationski-backend\",area=\"heap\"})", "legendFormat": "used"}, {"refId": "B", "expr": "sum(jvm_memory_max_bytes{job=\"stationski-backend\",area=\"heap\"})", "legendFormat": "max"}],
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0}, "overrides": []}
+    },
+    {
+      "id": 6, "title": "JVM process CPU", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "stationski-prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "targets": [{"refId": "A", "expr": "process_cpu_usage{job=\"stationski-backend\"}", "legendFormat": "process CPU"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []}
+    }
+  ]
+}

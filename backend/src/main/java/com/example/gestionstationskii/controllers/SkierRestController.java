@@ -2,6 +2,7 @@ package com.example.gestionstationskii.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import com.example.gestionstationskii.services.*;
@@ -19,7 +20,7 @@ public class SkierRestController {
 
     @Operation(summary = "Modifier les informations personnelles d'un skieur")
     @PutMapping("/update")
-    public Skier update(@RequestBody Skier skier) { return skierServices.updateSkier(skier); }
+    public Skier update(@RequestBody Requests.SkierInput input) { return skierServices.updateSkier(input.toEntity()); }
 
     @Operation(summary = "Rechercher par nom et ville ; pagination indexée à zéro")
     @GetMapping("/search")
@@ -29,15 +30,15 @@ public class SkierRestController {
 
     @Operation(description = "Add Skier")
     @PostMapping("/add")
-    public Skier addSkier(@RequestBody Skier skier){
-        return  skierServices.addSkier(skier);
+    public Skier addSkier(@RequestBody Requests.SkierInput input){
+        return skierServices.addSkier(input.toEntity());
     }
 
     @Operation(description = "Add Skier And Assign To Course")
     @PostMapping("/addAndAssign/{numCourse}")
-    public Skier addSkierAndAssignToCourse(@RequestBody Skier skier,
+    public Skier addSkierAndAssignToCourse(@RequestBody Requests.SkierInput input,
                                            @PathVariable("numCourse") Long numCourse){
-        return  skierServices.addSkierAndAssignToCourse(skier,numCourse);
+        return skierServices.addSkierAndAssignToCourse(input.toEntity(),numCourse);
     }
     @Operation(description = "Assign Skier To Subscription")
     @PutMapping("/assignToSub/{numSkier}/{numSub}")

@@ -27,9 +27,10 @@ public class Registration implements Serializable {
 	Long numRegistration;
 	int numWeek;
 	@Column(nullable = false)
+	@org.hibernate.annotations.ColumnDefault("false")
 	boolean cancelled;
 	@ManyToOne
-	PlanningSlot planningSlot;
+	private PlanningSlot planningSlot;
 
 	@JsonIgnore
 	@ManyToOne

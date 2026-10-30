@@ -2,6 +2,7 @@ package com.example.gestionstationskii.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -41,10 +42,10 @@ public class SubscriptionRestController {
 
     @Operation(description = "Add Subscription ")
     @PostMapping("/add")
-    public Subscription addSubscription(@RequestBody Subscription subscription){
+    public Subscription addSubscription(@RequestBody Requests.SubscriptionInput input){
         log.debug("Requête de création d'abonnement reçue : type={}, début={}",
-                subscription.getTypeSub(), subscription.getStartDate());
-        Subscription saved = subscriptionServices.addSubscription(subscription);
+                input.getTypeSub(), input.getStartDate());
+        Subscription saved = subscriptionServices.addSubscription(input.toEntity());
         log.info("Requête de création d'abonnement terminée : id={}", saved.getNumSub());
         return saved;
     }
@@ -68,9 +69,9 @@ public class SubscriptionRestController {
     }
     @Operation(description = "Update Subscription ")
     @PutMapping("/update")
-    public Subscription updateSubscription(@RequestBody Subscription subscription){
-        log.debug("Requête de mise à jour d'abonnement reçue : id={}", subscription.getNumSub());
-        Subscription updated = subscriptionServices.updateSubscription(subscription);
+    public Subscription updateSubscription(@RequestBody Requests.SubscriptionInput input){
+        log.debug("Requête de mise à jour d'abonnement reçue : id={}", input.getNumSub());
+        Subscription updated = subscriptionServices.updateSubscription(input.toEntity());
         log.info("Requête de mise à jour d'abonnement terminée : id={}", updated.getNumSub());
         return updated;
     }

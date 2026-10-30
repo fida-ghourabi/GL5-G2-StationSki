@@ -10,10 +10,12 @@ import com.example.gestionstationskii.repositories.*;
 import java.util.HashSet;
 import java.util.List;
 
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 @Service
 @Transactional(isolation = Isolation.READ_COMMITTED)
 public class SkierServicesImpl implements ISkierServices {
+    private static final String SKIER_RESOURCE = "Skieur";
 
     private final ISkierRepository skierRepository;
 
@@ -32,11 +34,16 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Skier> retrieveAllSkiers() {
-        return skierRepository.findAll();
+        return logged("list", null, () -> {
+            List<Skier> skiers = skierRepository.findAll();
+            log.debug("Skier list returned count={}", skiers.size());
+            return skiers;
+        });
     }
 
     @Override
     public Skier addSkier(Skier skier) {
+        return logged("create", null, () -> {
         Checks.require(skier.getNumSkier() == null, "Identifiant généré à la création");
         validate(skier);
         if (skier.getSubscription() != null) {
@@ -50,13 +57,16 @@ public class SkierServicesImpl implements ISkierServices {
         }
         skier.setPistes(new HashSet<>());
         skier.setRegistrations(new HashSet<>());
-        return skierRepository.save(skier);
+        Skier saved = skierRepository.save(skier);
+        log.info("Skier created id={}", saved.getNumSkier());
+        return saved;
+        });
     }
 
     @Override
     public Skier assignSkierToSubscription(Long numSkier, Long numSubscription) {
         Checks.id(numSkier); Checks.id(numSubscription);
-        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         Subscription subscription = subscriptionRepository.lockById(numSubscription).orElseThrow(() -> BusinessException.missing("Abonnement"));
         Skier owner = skierRepository.findBySubscription(subscription);
         if (owner != null) throw BusinessException.conflict("Abonnement déjà affecté");
@@ -76,24 +86,30 @@ public class SkierServicesImpl implements ISkierServices {
 
     @Override
     public void removeSkier(Long numSkier) {
+        logged("delete", numSkier, () -> {
         Skier skier = retrieveSkier(numSkier);
         if (registrationRepository.existsBySkier_NumSkier(numSkier)
                 || paymentRepository.existsBySkier_NumSkier(numSkier))
             throw BusinessException.conflict("Skieur ayant un historique d'inscription ou de paiement : suppression refusée");
         skierRepository.delete(skier);
+        log.info("Skier deletion submitted id={}", numSkier);
+        return null;
+        });
     }
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Skier retrieveSkier(Long numSkier) {
-        Checks.id(numSkier);
-        return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing("Skieur"));
+        return logged("read", numSkier, () -> {
+            Checks.id(numSkier);
+            return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
+        });
     }
 
     @Override
     public Skier assignSkierToPiste(Long numSkieur, Long numPiste) {
         Checks.id(numSkieur); Checks.id(numPiste);
-        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier skier = skierRepository.lockById(numSkieur).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         Piste piste = pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
         if (skier.getPistes() == null) skier.setPistes(new HashSet<>());
         if (!skier.getPistes().add(piste)) throw BusinessException.conflict("Skieur déjà affecté à cette piste");
@@ -108,18 +124,37 @@ public class SkierServicesImpl implements ISkierServices {
         return skierRepository.findBySubscription_TypeSub(typeSubscription);
     }
 
+    // Do not log names, birth dates, cities or full entity objects.
+    // Completion here is inside the transaction, before its eventual commit.
+    private <T> T logged(String operation, Long id, java.util.function.Supplier<T> action) {
+        log.debug("Skier operation={} requested id={}", operation, id);
+        try {
+            T result = action.get();
+            log.debug("Skier operation={} completed id={}", operation, id);
+            return result;
+        } catch (RuntimeException ex) {
+            log.error("Skier operation={} failed id={}", operation, id, ex);
+            throw ex;
+        }
+    }
+
     private void validate(Skier skier) {
         Checks.text(skier.getFirstName(), "Prénom"); Checks.text(skier.getLastName(), "Nom"); Checks.text(skier.getCity(), "Ville");
         Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(java.time.LocalDate.now()), "Date de naissance passée requise");
     }
     @Override
     public Skier updateSkier(Skier input) {
+        return logged("update", input == null ? null : input.getNumSkier(), () -> {
         validate(input);
         Checks.id(input.getNumSkier());
-        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing("Skieur"));
+        Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
         current.setFirstName(input.getFirstName()); current.setLastName(input.getLastName());
+        boolean profileChanged = !java.util.Objects.equals(current.getCity(), input.getCity());
         current.setCity(input.getCity()); current.setDateOfBirth(input.getDateOfBirth());
-        return skierRepository.save(current);
+        Skier saved = skierRepository.save(current);
+        log.info("Skier updated id={} cityChanged={}", saved.getNumSkier(), profileChanged);
+        return saved;
+        });
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)

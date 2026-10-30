@@ -48,8 +48,7 @@ class BusinessRulesTest {
         PlanningSlot existing = new PlanningSlot(); existing.setId(5L); existing.setInstructor(instructor); existing.setStatus(SlotStatus.OPEN);
         existing.setStartTime(day.atTime(10, 0)); existing.setEndTime(day.atTime(12, 0));
         when(courses.lockById(1L)).thenReturn(Optional.of(course)); when(instructors.lockById(1L)).thenReturn(Optional.of(instructor));
-        when(instructors.findById(1L)).thenReturn(Optional.of(instructor)); when(availability.findByInstructor_NumInstructor(1L)).thenReturn(Collections.singletonList(a));
-        when(slots.findAll()).thenReturn(Collections.singletonList(existing));
+        when(instructors.existsById(1L)).thenReturn(true); when(availability.findByInstructor_NumInstructor(1L)).thenReturn(Collections.singletonList(a));        when(slots.findAll()).thenReturn(Collections.singletonList(existing));
         Requests.Slot input = new Requests.Slot(); input.setCourseId(1L); input.setInstructorId(1L); input.setMaxCapacity(6);
         input.setStartTime(day.atTime(11, 0)); input.setEndTime(day.atTime(13, 0));
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class, () -> service.create(input)).getStatus());

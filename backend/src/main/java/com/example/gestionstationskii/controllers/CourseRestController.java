@@ -1,6 +1,7 @@
 package com.example.gestionstationskii.controllers;
 
 import com.example.gestionstationskii.entities.Course;
+import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.services.ICourseServices;
 import com.example.gestionstationskii.entities.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,8 +44,8 @@ public class CourseRestController {
 
     @Operation(description = "Add Course")
     @PostMapping("/add")
-    public Course addCourse(@RequestBody Course course){
-        return  courseServices.addCourse(course);
+    public Course addCourse(@RequestBody Requests.CourseInput input){
+        return courseServices.addCourse(input.toEntity());
     }
 
     @Operation(description = "Retrieve all Courses")
@@ -55,8 +56,8 @@ public class CourseRestController {
 
     @Operation(description = "Update Course ")
     @PutMapping("/update")
-    public Course updateCourse(@RequestBody Course course){
-        return  courseServices.updateCourse(course);
+    public Course updateCourse(@RequestBody Requests.CourseInput input){
+        return courseServices.updateCourse(input.toEntity());
     }
 
     @Operation(description = "Retrieve Course by Id")

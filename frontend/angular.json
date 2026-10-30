@@ -8,6 +8,18 @@
       "root": "",
       "sourceRoot": "src",
       "architect": {
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "coverage": true,
+            "coverageReporters": ["text-summary", "lcov"],
+            "coverageInclude": [
+              "src/app/features/payments/payment-api.ts",
+              "src/app/features/subscriptions/subscription-api.ts"
+            ]
+          }
+        },
         "build": {
           "builder": "@angular/build:application",
           "options": {

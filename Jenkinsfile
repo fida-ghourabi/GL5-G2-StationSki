@@ -317,6 +317,10 @@ pipeline {
         }
 
         stage('FRONTEND SONARQUBE') {
+            tools {
+                // SonarQube Community Build 26.9 requires Java 21 for analysis.
+                jdk 'JDK21'
+            }
             steps {
                 script {
                     def scannerHome = tool 'SonarScannerCLI'

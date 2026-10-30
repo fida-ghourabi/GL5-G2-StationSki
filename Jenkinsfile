@@ -8,6 +8,18 @@ pipeline {
     agent any
 
     /*
+     * Reconstruction complète de l'infrastructure, uniquement sur demande.
+     * La suppression exige aussi une approbation manuelle dans le stage dédié.
+     */
+    parameters {
+        booleanParam(
+            name: 'DESTROY_AWS_INFRASTRUCTURE_ONLY',
+            defaultValue: false,
+            description: 'Supprimer toutes les ressources Terraform AWS et arrêter le pipeline sans les recréer.'
+        )
+    }
+
+    /*
      * Options générales du pipeline.
      */
     options {
@@ -124,6 +136,9 @@ pipeline {
          * Cela évite d'utiliser un ancien JAR ou d'anciens fichiers.
          */
         stage('MVN CLEAN') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 /*
                  * Le projet Maven se trouve dans backend.
@@ -148,6 +163,9 @@ pipeline {
          * d'un stage dédié UNIT TESTS.
          */
         stage('ARTIFACT CONSTRUCTION') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 dir('backend') {
                     /*
@@ -185,6 +203,9 @@ pipeline {
          * Exécute les tests Maven.
          */
         stage('UNIT TESTS') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 dir('backend') {
                     /*
@@ -220,6 +241,9 @@ pipeline {
          * vers SonarQube.
          */
         stage('MVN SONARQUBE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 /*
                  * withSonarQubeEnv injecte dans Maven :
@@ -268,6 +292,9 @@ pipeline {
          * pass before the monorepo pipeline proceeds.
          */
         stage('FRONTEND INSTALL') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             tools {
                 nodejs 'NodeJS24'
             }
@@ -283,6 +310,9 @@ pipeline {
         }
 
         stage('FRONTEND UNIT TESTS') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             tools {
                 nodejs 'NodeJS24'
             }
@@ -303,6 +333,9 @@ pipeline {
         }
 
         stage('FRONTEND BUILD') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             tools {
                 nodejs 'NodeJS24'
             }
@@ -317,6 +350,9 @@ pipeline {
         }
 
         stage('FRONTEND SONARQUBE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             tools {
                 // SonarQube Community Build 26.9 requires Java 21 for analysis.
                 jdk 'JDK21'
@@ -345,6 +381,9 @@ pipeline {
         }
 
         stage('FRONTEND PUBLISH TO NEXUS') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             tools {
                 nodejs 'NodeJS24'
             }
@@ -406,6 +445,9 @@ pipeline {
          * Maven publiera l'artefact dans maven-snapshots.
          */
         stage('PUBLISH TO NEXUS') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 /*
                  * Récupère temporairement les credentials Nexus
@@ -468,6 +510,9 @@ pipeline {
          * backend/target/
          */
         stage('BUILDING OUR IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 dir('backend') {
                     script {
@@ -507,6 +552,9 @@ pipeline {
          * dockerhub-credentials
          */
         stage('DEPLOY OUR IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 script {
                     /*
@@ -558,6 +606,9 @@ pipeline {
          * depuis Docker Hub.
          */
         stage('VERIFY DOCKER HUB IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 script {
                     /*
@@ -599,6 +650,9 @@ pipeline {
          * et avoir l'identifiant : aws-credentials
          */
         stage('TEST AWS CREDENTIALS') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 withCredentials([
                     file(
@@ -620,7 +674,66 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 11 : SETUP TERRAFORM
+         * Stage 11 : DESTROY AWS INFRASTRUCTURE ONLY (OPTIONAL)
+         * ============================================================
+         *
+         * Ce stage n'est exécuté que si le paramètre de suppression seule
+         * est coché. Terraform affiche le plan complet puis attend une
+         * approbation avant de supprimer les ressources. Les stages de
+         * création et de déploiement sont alors ignorés.
+         */
+        stage('DESTROY AWS INFRASTRUCTURE ONLY') {
+            when {
+                expression { params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform init -input=false'
+
+                    withCredentials([
+                        file(
+                            credentialsId: 'aws-credentials',
+                            variable: 'AWS_CREDENTIALS_FILE'
+                        )
+                    ]) {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="$AWS_REGION"
+                            export TF_IN_AUTOMATION="true"
+                            aws sts get-caller-identity
+                            terraform plan -destroy -input=false -out=destroy.tfplan
+                        '''
+                    }
+
+                    timeout(time: 15, unit: 'MINUTES') {
+                        input(
+                            message: 'Le plan ci-dessus supprime toutes les ressources Terraform AWS, dont EKS, le réseau et RDS sans snapshot final. Confirmer la suppression uniquement ?',
+                            ok: 'Confirmer la suppression complète'
+                        )
+                    }
+
+                    withCredentials([
+                        file(
+                            credentialsId: 'aws-credentials',
+                            variable: 'AWS_CREDENTIALS_FILE'
+                        )
+                    ]) {
+                        sh '''
+                            set +x
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                            export AWS_DEFAULT_REGION="$AWS_REGION"
+                            export TF_IN_AUTOMATION="true"
+                            terraform apply -input=false destroy.tfplan
+                        '''
+                    }
+                }
+            }
+        }
+
+        /*
+         * ============================================================
+         * Stage 12 : SETUP TERRAFORM
          * ============================================================
          *
          * Regroupe le cycle Terraform comme dans le pipeline de
@@ -629,6 +742,9 @@ pipeline {
          * Une approbation humaine est conservée entre plan et apply.
          */
         stage('SETUP TERRAFORM') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 dir("${TERRAFORM_DIR}") {
                     sh 'terraform fmt -check -recursive'
@@ -677,12 +793,15 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 12 : UPDATE KUBECONFIG
+         * Stage 13 : UPDATE KUBECONFIG
          * ============================================================
          *
          * Configure kubectl pour le cluster créé par Terraform.
          */
         stage('UPDATE KUBECONFIG') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 withCredentials([
                     file(
@@ -712,6 +831,9 @@ pipeline {
 
 
                 stage('DEPLOY TO AWS KUBERNETES') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
             steps {
                 withCredentials([
                     file(
@@ -807,8 +929,14 @@ pipeline {
          * Exécuté uniquement si tous les stages réussissent.
          */
         success {
-            echo 'Pipeline terminé avec succès.'
-            echo "Image publiée : ${DOCKER_IMAGE}:${IMAGE_TAG}"
+            script {
+                if (params.DESTROY_AWS_INFRASTRUCTURE_ONLY) {
+                    echo 'Destruction complète de l’infrastructure Terraform terminée.'
+                } else {
+                    echo 'Pipeline terminé avec succès.'
+                    echo "Image publiée : ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                }
+            }
         }
 
         /*

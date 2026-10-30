@@ -9,23 +9,30 @@ import org.springdoc.core.customizers.OpenApiCustomiser;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
 @Configuration
 public class OpenAPIConfig {
 
-    private static final Map<String, String> PARAMETER_DESCRIPTIONS = Map.of(
-            "from", "Début inclus de la période, au format ISO",
-            "to", "Fin exclue de la période, au format ISO",
-            "asOf", "Date de référence incluse, au format ISO yyyy-MM-dd",
-            "page", "Index de page à partir de zéro",
-            "size", "Nombre de résultats par page, de 1 à 100",
-            "name", "Fragment du nom ou du prénom, insensible à la casse",
-            "city", "Fragment du nom de ville, insensible à la casse",
-            "level", "Niveau du cours, entier strictement positif",
-            "date1", "Date de début inclusive (yyyy-MM-dd)",
-            "date2", "Date de fin inclusive (yyyy-MM-dd)");
+    private static final Map<String, String> PARAMETER_DESCRIPTIONS;
+
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("from", "Début inclus de la période, au format ISO");
+        m.put("to", "Fin exclue de la période, au format ISO");
+        m.put("asOf", "Date de référence incluse, au format ISO yyyy-MM-dd");
+        m.put("page", "Index de page à partir de zéro");
+        m.put("size", "Nombre de résultats par page, de 1 à 100");
+        m.put("name", "Fragment du nom ou du prénom, insensible à la casse");
+        m.put("city", "Fragment du nom de ville, insensible à la casse");
+        m.put("level", "Niveau du cours, entier strictement positif");
+        m.put("date1", "Date de début inclusive (yyyy-MM-dd)");
+        m.put("date2", "Date de fin inclusive (yyyy-MM-dd)");
+        PARAMETER_DESCRIPTIONS = Collections.unmodifiableMap(m);
+    }
 
     @Bean
     public OpenAPI springShopOpenAPI() {

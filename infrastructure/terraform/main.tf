@@ -42,6 +42,25 @@ module "eks" {
   cluster_version = var.kubernetes_version
   enable_irsa     = false
 
+  node_security_group_additional_rules = {
+    ingress_self_all = {
+      description = "Node to node all ports and protocols"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "ingress"
+      self        = true
+    }
+    egress_self_all = {
+      description = "Node to node all ports and protocols"
+      protocol    = "-1"
+      from_port   = 0
+      to_port     = 0
+      type        = "egress"
+      self        = true
+    }
+  }
+
   cluster_endpoint_public_access = true
   create_kms_key                 = false
   cluster_encryption_config      = []

@@ -1,4 +1,6 @@
-package com.example.gestionstationskii.services;
+package com.example.gestionstationskii.services.registration;
+
+import com.example.gestionstationskii.services.*;
 
 import com.example.gestionstationskii.controllers.ApiExceptionHandler;
 import com.example.gestionstationskii.controllers.RegistrationRestController;

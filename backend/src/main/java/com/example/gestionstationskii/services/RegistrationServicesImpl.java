@@ -12,6 +12,7 @@ import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import javax.persistence.EntityManager;
 import java.time.Period;
+import java.time.ZoneId;
 import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
@@ -113,7 +114,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     }
 
     private void ensureSlotCanAcceptRegistration(PlanningSlot slot, Long slotId) {
-        if (slot.getStatus() != SlotStatus.OPEN || !slot.getStartTime().isAfter(java.time.LocalDateTime.now())) {
+        if (slot.getStatus() != SlotStatus.OPEN || !slot.getStartTime().isAfter(java.time.LocalDateTime.now(ZoneId.systemDefault()))) {
             log.warn("Registration rejected: slot {} is closed or has already started", slotId);
             throw BusinessException.conflict("Créneau complet, annulé ou déjà commencé");
         }
@@ -182,7 +183,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
             log.debug("Registration {} was already cancelled", id);
             return;
         }
-        if (slot != null && !slot.getStartTime().isAfter(java.time.LocalDateTime.now())) {
+        if (slot != null && !slot.getStartTime().isAfter(java.time.LocalDateTime.now(ZoneId.systemDefault()))) {
             log.warn("Cancellation rejected: registration {} has already started", id);
             throw BusinessException.conflict("Inscription commencée non annulable");
         }

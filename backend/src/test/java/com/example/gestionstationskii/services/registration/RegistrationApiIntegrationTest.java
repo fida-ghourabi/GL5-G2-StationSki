@@ -1,4 +1,4 @@
-package com.example.gestionstationskii.services;
+package com.example.gestionstationskii.services.registration;
 
 import com.example.gestionstationskii.entities.Course;
 import com.example.gestionstationskii.entities.Instructor;

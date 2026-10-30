@@ -152,6 +152,10 @@ Database data is retained in its own named volume. Do not use `down -v` unless y
 
 Verified locally: Maven build/tests pass, MySQL is healthy, backend OpenAPI returns HTTP 200. Save screenshots of the running containers/image and Swagger. The manual image was pushed to `yassine1234/stationski-backend:manual-test`. Jenkins now builds/pushes `jenkins-BUILD_NUMBER` tags; add its `dockerhub` credential and push the updated files before running it. See the Jenkins setup guide. Automated push still needs verification.
 
+## Optional AWS pipeline demo
+
+See [AWS pipeline instructions](devops/aws-pipeline.md). AWS stages are **disabled by default** and require a separate Secret-file credential, explicit plan/cost approval, and a screenshot window followed by automatic cleanup. Cleanup is best-effort: expired credentials/controller failures require manual recovery. No new AWS infrastructure was created while adding this automation. The earlier manual AWS demo was destroyed and verified.
+
 ## Troubleshooting
 
 - Port 8087/4200 occupied: stop the existing backend/frontend first. `stop.sh` does not manage instances started manually.

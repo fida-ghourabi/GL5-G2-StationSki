@@ -1,6 +1,13 @@
 # Controller uses Java 21; Maven builds explicitly select Java 17.
+FROM hashicorp/terraform:1.17.1 AS terraform-cli
+FROM registry.k8s.io/kubectl:v1.36.2 AS kubectl-cli
+FROM public.ecr.aws/aws-cli/aws-cli:2.39.1 AS aws-cli
 FROM docker:cli AS docker-cli
 FROM eclipse-temurin:17-jdk AS build-jdk
 FROM jenkins/jenkins:lts-jdk21@sha256:a660310e39ade10631f774bacd5219de767dfd08947ea5c32a739b5e5bb382c1
 COPY --from=build-jdk /opt/java/openjdk /opt/java17
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=terraform-cli /bin/terraform /usr/local/bin/terraform
+COPY --from=kubectl-cli /bin/kubectl /usr/local/bin/kubectl
+COPY --from=aws-cli /usr/local/aws-cli /usr/local/aws-cli
+ENV PATH="/usr/local/aws-cli/v2/current/bin:${PATH}"

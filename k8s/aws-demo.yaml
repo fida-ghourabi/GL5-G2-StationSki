@@ -1,0 +1,131 @@
+# Temporary screenshot demo only. No LoadBalancer, external database or PVC.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stationski-demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: stationski-demo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0.33
+          envFrom:
+            - secretRef:
+                name: mysql-environment
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          startupProbe:
+            tcpSocket:
+              port: 3306
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 3306
+            periodSeconds: 5
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: stationski-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: stationski-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: yassine1234/stationski-backend:jenkins-7
+          ports:
+            - containerPort: 8087
+          env:
+            - name: DB_URL
+              value: jdbc:mysql://mysql:3306/skidb?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-environment
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-environment
+                  key: MYSQL_PASSWORD
+            - name: SPRING_PROFILES_ACTIVE
+              value: local
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /stationSki/v3/api-docs
+              port: 8087
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /stationSki/v3/api-docs
+              port: 8087
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: stationski-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 8087
+      targetPort: 8087

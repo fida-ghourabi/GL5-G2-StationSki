@@ -1078,7 +1078,8 @@ pipeline {
                     dir('backend') {
                         sh '''
                             ./mvnw -B org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar \
-                              -Dsonar.projectKey=stationski-inscription \
+                              -Dsonar.projectKey=feature-hajer-iben-nasr \
+                              -Dsonar.projectName=feature/hajer-iben-nasr \
                               -Dsonar.host.url="$SONAR_URL" \
                               -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                         '''

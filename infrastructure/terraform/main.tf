@@ -141,3 +141,14 @@ resource "aws_db_instance" "mysql" {
   skip_final_snapshot = true
   apply_immediately   = true
 }
+
+
+resource "aws_security_group_rule" "node_to_rds" {
+  type                     = "egress"
+  description              = "Allow EKS nodes to reach RDS MySQL"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  security_group_id        = module.eks.node_security_group_id
+  source_security_group_id = aws_security_group.rds.id
+}

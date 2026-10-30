@@ -1,0 +1,90 @@
+---
+- name: Créer le réseau Docker
+  community.docker.docker_network:
+    name: "{{ docker_network }}"
+    state: present
+
+- name: Créer le volume des données MySQL
+  community.docker.docker_volume:
+    name: stationski-db-data
+    state: present
+
+- name: Démarrer MySQL
+  community.docker.docker_container:
+    name: "{{ db_container }}"
+    image: mysql:8.0
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ docker_network }}"
+    volumes:
+      - stationski-db-data:/var/lib/mysql
+    env:
+      MYSQL_ROOT_PASSWORD: "{{ db_password }}"
+      MYSQL_DATABASE: "{{ db_name }}"
+      MYSQL_USER: "{{ db_user }}"
+      MYSQL_PASSWORD: "{{ db_password }}"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+  no_log: true
+
+- name: Attendre que MySQL soit prêt
+  community.docker.docker_container_info:
+    name: "{{ db_container }}"
+  register: db_info
+  until: db_info.container.State.Health.Status | default("") == "healthy"
+  retries: 30
+  delay: 5
+
+- name: Démarrer le backend
+  community.docker.docker_container:
+    name: "{{ backend_container }}"
+    image: "{{ backend_image }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ docker_network }}"
+    env:
+      DB_URL: "jdbc:mysql://{{ db_container }}:3306/{{ db_name }}?serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8"
+      DB_USERNAME: "{{ db_user }}"
+      DB_PASSWORD: "{{ db_password }}"
+      # Base neuve : Hibernate crée les tables (application.properties est en validate).
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+  no_log: true
+
+- name: Attendre que le backend tourne
+  community.docker.docker_container_info:
+    name: "{{ backend_container }}"
+  register: backend_info
+  until: backend_info.container.State.Running | default(false)
+  retries: 12
+  delay: 5
+
+- name: Démarrer le frontend
+  community.docker.docker_container:
+    name: "{{ frontend_container }}"
+    image: "{{ frontend_image }}"
+    state: started
+    restart_policy: unless-stopped
+    networks:
+      - name: "{{ docker_network }}"
+    published_ports:
+      - "{{ frontend_port }}:8080"
+
+- name: Smoke test de l API (même test que le stage EKS)
+  ansible.builtin.uri:
+    url: "http://localhost:{{ frontend_port }}/stationSki/registration/skier/1"
+    status_code: [200, 404]
+    timeout: 15
+  register: smoke
+  until: smoke.status is defined and smoke.status in [200, 404]
+  retries: 30
+  delay: 10
+
+- name: Résultat
+  ansible.builtin.debug:
+    msg: "Application disponible sur http://{{ ansible_host | default(inventory_hostname) }} (smoke test HTTP {{ smoke.status }})"

@@ -995,7 +995,6 @@
 //     }
 // }
 
-
 pipeline {
     agent any
 
@@ -1022,6 +1021,10 @@ pipeline {
         string(name: 'DOCKERHUB_NAMESPACE', defaultValue: 'bennasserhajer', description: 'Namespace Docker Hub propriétaire des images.')
         string(name: 'SONAR_URL', defaultValue: 'http://sonarqube:9000', description: 'URL SonarQube joignable depuis Jenkins.')
         string(name: 'NEXUS_MAVEN_URL', defaultValue: 'http://nexus:8081/repository/maven-snapshots/', description: 'URL du dépôt Maven snapshots Nexus.')
+        choice(name: 'NEXUS_TARGET', choices: ['snapshot', 'release', 'both'], description: 'Type de publication Nexus : snapshot, release ou les deux.')
+        string(name: 'RELEASE_VERSION', defaultValue: '1.0.0', description: 'Version utilisée pour la release Nexus (sans -SNAPSHOT).')
+        string(name: 'NEXUS_RELEASE_URL', defaultValue: 'http://nexus:8081/repository/maven-releases/', description: 'URL du dépôt Maven releases Nexus.')
+        string(name: 'NOTIFY_EMAIL', defaultValue: 'ton.email@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
     }
 
     environment {
@@ -1101,12 +1104,31 @@ pipeline {
                             settings_file="$(mktemp)"
                             trap 'rm -f "$settings_file"' EXIT
                             python3 -c 'import os, xml.sax.saxutils; print("<settings><servers><server><id>stationski-nexus</id><username>" + xml.sax.saxutils.escape(os.environ["NEXUS_USER"]) + "</username><password>" + xml.sax.saxutils.escape(os.environ["NEXUS_PASSWORD"]) + "</password></server></servers></settings>")' > "$settings_file"
-                            ./mvnw -B -s "$settings_file" org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file \
-                              -DrepositoryId=stationski-nexus \
-                              -Durl="$NEXUS_MAVEN_URL" \
-                              -Dfile=target/gestion-station-skii-0.0.1-SNAPSHOT.jar \
-                              -DpomFile=pom.xml \
-                              -DgeneratePom=false
+                            JAR="$(ls target/gestion-station-skii-*.jar | grep -v original | head -1)"
+                            echo "JAR à publier : $JAR"
+
+                            if [ "$NEXUS_TARGET" = "snapshot" ] || [ "$NEXUS_TARGET" = "both" ]; then
+                                echo "=== Publication SNAPSHOT ==="
+                                ./mvnw -B -s "$settings_file" org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file \\
+                                  -DrepositoryId=stationski-nexus \\
+                                  -Durl="$NEXUS_MAVEN_URL" \\
+                                  -Dfile="$JAR" \\
+                                  -DpomFile=pom.xml \\
+                                  -DgeneratePom=false
+                            fi
+
+                            if [ "$NEXUS_TARGET" = "release" ] || [ "$NEXUS_TARGET" = "both" ]; then
+                                echo "=== Publication RELEASE $RELEASE_VERSION ==="
+                                ./mvnw -B -s "$settings_file" org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy-file \\
+                                  -DrepositoryId=stationski-nexus \\
+                                  -Durl="$NEXUS_RELEASE_URL" \\
+                                  -Dfile="$JAR" \\
+                                  -DgroupId=com.example \\
+                                  -DartifactId=gestion-station-skii \\
+                                  -Dversion="$RELEASE_VERSION" \\
+                                  -Dpackaging=jar \\
+                                  -DgeneratePom=true
+                            fi
                         '''
                     }
                 }
@@ -1383,9 +1405,32 @@ pipeline {
         success {
             echo "Build ${env.BUILD_NUMBER} OK — ${env.BACKEND_IMAGE}:${env.IMAGE_TAG} et ${env.FRONTEND_IMAGE}:${env.IMAGE_TAG}"
             echo "L'infrastructure AWS reste en place : pense à la détruire manuellement (coûts AWS)."
+            mail to: params.NOTIFY_EMAIL,
+                 subject: "✅ SUCCESS : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: """Le build ${env.BUILD_NUMBER} a réussi.
+
+Backend  : ${env.BACKEND_IMAGE}:${env.IMAGE_TAG}
+Frontend : ${env.FRONTEND_IMAGE}:${env.IMAGE_TAG}
+Nexus    : ${params.NEXUS_TARGET}${params.NEXUS_TARGET != 'snapshot' ? ' (release ' + params.RELEASE_VERSION + ')' : ''}
+
+Détails : ${env.BUILD_URL}
+
+Rappel : l'infrastructure AWS n'est pas détruite (coûts AWS)."""
         }
         failure {
             echo "Build ${env.BUILD_NUMBER} en échec : consulte la Console Output. L'infrastructure AWS n'est PAS détruite."
+            mail to: params.NOTIFY_EMAIL,
+                 subject: "❌ FAILED : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: """Le build ${env.BUILD_NUMBER} a échoué.
+
+Logs : ${env.BUILD_URL}console
+
+L'infrastructure AWS n'est PAS détruite."""
+        }
+        unstable {
+            mail to: params.NOTIFY_EMAIL,
+                 subject: "⚠️ UNSTABLE : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Build instable (tests en échec ?). Détails : ${env.BUILD_URL}"
         }
     }
 }

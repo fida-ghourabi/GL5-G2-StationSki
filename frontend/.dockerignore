@@ -1,0 +1,24 @@
+# Dependencies and generated build output
+node_modules
+dist
+coverage
+.angular
+.scannerwork
+.tmp
+
+# Local tooling and repository metadata
+.git
+.github
+.vscode
+.idea
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Logs, JVM crash reports, and core dumps
+*.log
+hs_err_pid*
+core
+core.*

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -143,7 +144,8 @@ class PaymentServicesMockitoTest {
         when(subscriptions.lockById(2L)).thenReturn(Optional.of(subscription));
 
         Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
-        input.setTransactionReference("x".repeat(256));
+        // Java 8 : String.repeat() n'existe pas (Java 11+)
+        input.setTransactionReference(repeat('x', 256));
 
         assertThrows(BusinessException.class, () -> service.recordPayment(input));
         verify(payments, never()).save(any());
@@ -305,6 +307,7 @@ class PaymentServicesMockitoTest {
         when(payments.findById(1L)).thenReturn(Optional.of(payment(1L, PaymentStatus.PAID)));
         when(refunds.findByPayment_Id(1L)).thenReturn(Collections.emptyList());
 
+        // refunds() retourne une List : List.isEmpty() est valide en Java 8
         assertTrue(service.refunds(1L).isEmpty());
     }
 
@@ -326,6 +329,13 @@ class PaymentServicesMockitoTest {
 
         assertEquals("SKI-TEST", receipt.getReceiptNumber());
         assertEquals(new BigDecimal("75.00"), receipt.getNetAmount());
+    }
+
+    /** Équivalent Java 8 de String.repeat(int). */
+    private static String repeat(char c, int times) {
+        char[] chars = new char[times];
+        Arrays.fill(chars, c);
+        return new String(chars);
     }
 
     private static Requests.PaymentInput paymentInput(Long skierId, Long subscriptionId, String amount) {

@@ -64,6 +64,8 @@ def commonMailRows() {
         ['Durée', duration]
     ]
 }
+
+
 // =======================================================
 
 pipeline {
@@ -95,7 +97,7 @@ pipeline {
         choice(name: 'NEXUS_TARGET', choices: ['snapshot', 'release', 'both'], description: 'Type de publication Nexus : snapshot, release ou les deux.')
         string(name: 'RELEASE_VERSION', defaultValue: '1.0.0', description: 'Version utilisée pour la release Nexus (sans -SNAPSHOT).')
         string(name: 'NEXUS_RELEASE_URL', defaultValue: 'http://nexus:8081/repository/maven-releases/', description: 'URL du dépôt Maven releases Nexus.')
-        string(name: 'NOTIFY_EMAIL', defaultValue: 'ton.email@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
+        string(name: 'NOTIFY_EMAIL', defaultValue: 'hajerbennacer03@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
     }
 
     environment {

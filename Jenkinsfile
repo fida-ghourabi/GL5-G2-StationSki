@@ -76,6 +76,7 @@ pipeline {
          * au même réseau Docker.
          */
         NEXUS_URL = 'http://nexus:8081'
+        FRONTEND_NEXUS_REPOSITORY = 'frontend-releases'
 
         /*
          * Nom du serveur SonarQube configuré dans Jenkins.
@@ -256,6 +257,133 @@ pipeline {
                  */
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        /*
+         * Frontend CI stages run after both backend checks and before any
+         * release artifact is published. This keeps the existing backend
+         * deployment flow unchanged while requiring the frontend checks to
+         * pass before the monorepo pipeline proceeds.
+         */
+        stage('FRONTEND INSTALL') {
+            tools {
+                nodejs 'NodeJS24'
+            }
+            steps {
+                dir('frontend') {
+                    sh '''
+                        node --version
+                        npm --version
+                        npm ci
+                    '''
+                }
+            }
+        }
+
+        stage('FRONTEND UNIT TESTS') {
+            tools {
+                nodejs 'NodeJS24'
+            }
+            steps {
+                dir('frontend') {
+                    sh 'npm run test:ci'
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'frontend/coverage/boreal/lcov.info',
+                        allowEmptyArchive: true,
+                        fingerprint: false
+                    )
+                }
+            }
+        }
+
+        stage('FRONTEND BUILD') {
+            tools {
+                nodejs 'NodeJS24'
+            }
+            steps {
+                dir('frontend') {
+                    sh '''
+                        npm run build
+                        test -d dist/boreal/browser
+                    '''
+                }
+            }
+        }
+
+        stage('FRONTEND SONARQUBE') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarScannerCLI'
+                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                        withEnv(["SONAR_SCANNER_HOME=${scannerHome}"]) {
+                            dir('frontend') {
+                                sh '''
+                                    set +x
+                                    test -f coverage/boreal/lcov.info
+                                    export SONAR_TOKEN="$SONAR_AUTH_TOKEN"
+                                    "$SONAR_SCANNER_HOME/bin/sonar-scanner" \\
+                                        -Dsonar.scanner.skipJreProvisioning=true
+                                '''
+                            }
+                        }
+                    }
+                }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('FRONTEND PUBLISH TO NEXUS') {
+            tools {
+                nodejs 'NodeJS24'
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'nexus-credentials',
+                        usernameVariable: 'NEXUS_USERNAME',
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )
+                ]) {
+                    dir('frontend') {
+                        sh '''
+                            set +x
+                            set -eu
+
+                            test -d dist/boreal/browser
+                            frontend_version="$(node -p "require('./package.json').version")"
+                            artifact_name="gestion-station-skii-frontend-${frontend_version}-${BUILD_NUMBER}.zip"
+                            artifact_directory="$(mktemp -d)"
+                            trap 'rm -rf "$artifact_directory"' EXIT
+                            artifact_file="$artifact_directory/$artifact_name"
+                            download_file="$artifact_directory/download.zip"
+
+                            jar --create --file "$artifact_file" --no-manifest \\
+                                -C dist/boreal/browser .
+
+                            artifact_url="${NEXUS_URL}/repository/${FRONTEND_NEXUS_REPOSITORY}/gestion-station-skii-frontend/${frontend_version}/${BUILD_NUMBER}/${artifact_name}"
+
+                            curl --fail --show-error --silent \\
+                                --user "$NEXUS_USERNAME:$NEXUS_PASSWORD" \\
+                                --upload-file "$artifact_file" \\
+                                "$artifact_url"
+
+                            curl --fail --show-error --silent \\
+                                --user "$NEXUS_USERNAME:$NEXUS_PASSWORD" \\
+                                --output "$download_file" \\
+                                "$artifact_url"
+
+                            cmp --silent "$artifact_file" "$download_file"
+                            echo "Frontend artifact published and verified: $artifact_url"
+                        '''
+                    }
                 }
             }
         }

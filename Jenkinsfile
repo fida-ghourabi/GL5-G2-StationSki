@@ -973,6 +973,54 @@ pipeline {
             }
         }
 
+        /*
+         * Stage 22 : déploiement et vérification du frontend dans EKS.
+         * Le test HTTP passe par le Service frontend puis par son proxy Nginx
+         * vers le Service backend, sans Ingress ni Load Balancer.
+         */
+        stage('DEPLOY FRONTEND TO AWS KUBERNETES') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDENTIALS_FILE'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                        export AWS_DEFAULT_REGION="$AWS_REGION"
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
+
+                        kubectl apply -f k8s/frontend/service.yaml
+                        sed -e "s|IMAGE_TAG|${IMAGE_TAG}|" \
+                            k8s/frontend/deployment.yaml | kubectl apply -f -
+
+                        kubectl -n stationski rollout status \
+                            deployment/frontend --timeout=420s || {
+                                kubectl -n stationski get pods
+                                kubectl -n stationski describe pods -l app=frontend | tail -60
+                                kubectl -n stationski logs deploy/frontend --tail=100
+                                exit 1
+                            }
+
+                        kubectl -n stationski delete pod frontend-api-check \
+                            --ignore-not-found
+                        kubectl -n stationski run frontend-api-check \
+                            --rm -i --restart=Never \
+                            --image=curlimages/curl --command -- \
+                            sh -c 'curl -fsS --max-time 20 http://frontend/healthz && curl -fsS --max-time 20 http://frontend/stationSki/actuator/health'
+
+                        kubectl -n stationski get pods
+                    '''
+                }
+            }
+        }
+
     }
 
     /*

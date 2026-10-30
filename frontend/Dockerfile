@@ -20,8 +20,8 @@ FROM nginx/nginx-unprivileged:1.30.6-alpine-slim
 
 COPY --from=build /app/dist/boreal/browser/ /usr/share/nginx/html/
 
-# Angular routes fall back to index.html. Until an Ingress is installed,
-# Nginx proxies API requests to the internal Kubernetes backend Service.
+# Angular routes fall back to index.html. Nginx also proxies API requests
+# to the internal Kubernetes backend Service behind the public load balancer.
 RUN printf '%s\n' \
     'server {' \
     '    listen 8080;' \

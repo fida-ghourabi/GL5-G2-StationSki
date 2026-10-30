@@ -5,12 +5,10 @@ metadata:
   namespace: stationski
   labels:
     app: frontend
-  annotations:
-    # Health check for the frontend target group created from the Ingress.
-    alb.ingress.kubernetes.io/healthcheck-path: /healthz
-    alb.ingress.kubernetes.io/success-codes: '200'
 spec:
-  type: ClusterIP
+  # With no AWS Load Balancer Controller, EKS' legacy AWS provider provisions
+  # a Classic Load Balancer for this Service.
+  type: LoadBalancer
   selector:
     app: frontend
   ports:

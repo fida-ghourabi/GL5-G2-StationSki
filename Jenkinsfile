@@ -975,8 +975,7 @@ pipeline {
 
         /*
          * Stage 22 : déploiement et vérification du frontend dans EKS.
-         * Le test HTTP passe par le Service frontend puis par son proxy Nginx
-         * vers le Service backend, sans Ingress ni Load Balancer.
+         * Le test HTTP interne passe par le Service frontend et son proxy Nginx.
          */
         stage('DEPLOY FRONTEND TO AWS KUBERNETES') {
             when {
@@ -1016,6 +1015,54 @@ pipeline {
                             sh -c 'curl -fsS --max-time 20 http://frontend/healthz && curl -fsS --max-time 20 http://frontend/stationSki/actuator/health'
 
                         kubectl -n stationski get pods
+                    '''
+                }
+            }
+        }
+
+        /* Verify the legacy AWS Service Controller's Classic Load Balancer. */
+        stage('VERIFY CLASSIC LOAD BALANCER') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDENTIALS_FILE'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDENTIALS_FILE"
+                        export AWS_DEFAULT_REGION="$AWS_REGION"
+                        export KUBECONFIG="$WORKSPACE/.kube/config"
+
+                        lb_hostname=""
+                        for attempt in $(seq 1 60); do
+                            lb_hostname="$(kubectl -n stationski get service frontend \\
+                                -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+                            if [ -n "$lb_hostname" ]; then
+                                break
+                            fi
+                            sleep 10
+                        done
+
+                        if [ -z "$lb_hostname" ]; then
+                            kubectl -n stationski describe service frontend || true
+                            echo "Classic Load Balancer hostname was not assigned within 10 minutes."
+                            exit 1
+                        fi
+
+                        echo "Classic Load Balancer hostname: $lb_hostname"
+                        curl --fail --show-error --silent --retry 8 \\
+                            --retry-all-errors --retry-delay 5 --max-time 20 \\
+                            "http://$lb_hostname/healthz" >/dev/null
+                        curl --fail --show-error --silent --retry 8 \\
+                            --retry-all-errors --retry-delay 5 --max-time 20 \\
+                            "http://$lb_hostname/stationSki/actuator/health/readiness"
+                        echo "Frontend and backend API are reachable through the Classic Load Balancer."
                     '''
                 }
             }

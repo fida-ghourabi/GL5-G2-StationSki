@@ -1,7 +1,9 @@
 package com.example.gestionstationskii.services.skier;
 
 import com.example.gestionstationskii.services.BusinessException;
+import com.example.gestionstationskii.services.IRegistrationServices;
 import com.example.gestionstationskii.services.ISkierServices;
+import com.example.gestionstationskii.services.ISubscriptionServices;
 import com.example.gestionstationskii.services.SkierServicesImpl;
 import com.example.gestionstationskii.controllers.SkierRestController;
 import com.example.gestionstationskii.dto.Requests;

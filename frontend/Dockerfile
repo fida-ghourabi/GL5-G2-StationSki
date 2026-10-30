@@ -20,8 +20,8 @@ FROM nginx/nginx-unprivileged:1.30.6-alpine-slim
 
 COPY --from=build /app/dist/boreal/browser/ /usr/share/nginx/html/
 
-# Angular routes fall back to index.html. The API is routed to the backend
-# by the Kubernetes Ingress; return 404 if that API path reaches this container.
+# Angular routes fall back to index.html. API requests are proxied to the
+# internal Kubernetes backend Service, keeping browser requests same-origin.
 RUN printf '%s\n' \
     'server {' \
     '    listen 8080;' \
@@ -35,7 +35,12 @@ RUN printf '%s\n' \
     '        return 200 "ok";' \
     '    }' \
     '    location ^~ /stationSki {' \
-    '        return 404;' \
+    '        proxy_pass http://backend.stationski.svc.cluster.local:8087;' \
+    '        proxy_http_version 1.1;' \
+    '        proxy_set_header Host $host;' \
+    '        proxy_set_header X-Real-IP $remote_addr;' \
+    '        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
+    '        proxy_set_header X-Forwarded-Proto $scheme;' \
     '    }' \
     '    location / {' \
     '        try_files $uri $uri/ /index.html;' \

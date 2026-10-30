@@ -75,6 +75,9 @@ pipeline {
          */
         DOCKER_IMAGE = 'fidagh/gestion-station-skii-backend'
 
+        /* Nom du dépôt Docker Hub réservé à l'image Angular frontend. */
+        FRONTEND_DOCKER_IMAGE = 'fidagh/gestion-station-skii-frontend'
+
         /*
          * BUILD_NUMBER est fourni automatiquement par Jenkins.
          * Exemple : 15
@@ -291,6 +294,7 @@ pipeline {
          * deployment flow unchanged while requiring the frontend checks to
          * pass before the monorepo pipeline proceeds.
          */
+        /* Stage 6 : installation des dépendances frontend. */
         stage('FRONTEND INSTALL') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -309,6 +313,7 @@ pipeline {
             }
         }
 
+        /* Stage 7 : tests unitaires frontend et rapport de couverture. */
         stage('FRONTEND UNIT TESTS') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -332,6 +337,7 @@ pipeline {
             }
         }
 
+        /* Stage 8 : compilation de l'application Angular. */
         stage('FRONTEND BUILD') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -349,6 +355,7 @@ pipeline {
             }
         }
 
+        /* Stage 9 : analyse SonarQube et Quality Gate frontend. */
         stage('FRONTEND SONARQUBE') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -380,6 +387,7 @@ pipeline {
             }
         }
 
+        /* Stage 10 : publication de l'archive statique frontend dans Nexus. */
         stage('FRONTEND PUBLISH TO NEXUS') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -431,9 +439,70 @@ pipeline {
             }
         }
 
+        /* Stage 11 : construction de l'image frontend. */
+        stage('BUILD FRONTEND IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                script {
+                    /* Le contexte frontend contient son Dockerfile et .dockerignore. */
+                    def builtImage = docker.build(
+                        "${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}",
+                        'frontend'
+                    )
+                    builtImage.tag('latest')
+                }
+            }
+        }
+
+        /* Stage 12 : publication des tags versionné et latest. */
+        stage('PUBLISH FRONTEND IMAGE TO DOCKER HUB') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                script {
+                    docker.withRegistry(
+                        'https://index.docker.io/v1/',
+                        'dockerhub-credentials'
+                    ) {
+                        docker.image(
+                            "${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}"
+                        ).push()
+                        docker.image(
+                            "${FRONTEND_DOCKER_IMAGE}:latest"
+                        ).push()
+                    }
+                }
+            }
+        }
+
+        /* Stage 13 : pull et inspection de l'image publiée. */
+        stage('VERIFY FRONTEND DOCKER HUB IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                script {
+                    docker.withRegistry(
+                        'https://index.docker.io/v1/',
+                        'dockerhub-credentials'
+                    ) {
+                        sh """
+                            set +x
+                            docker image rm ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG} || true
+                            docker pull ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}
+                            docker image inspect ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
         /*
          * ============================================================
-         * Stage 6 : PUBLISH TO NEXUS
+         * Stage 14 : PUBLISH TO NEXUS
          * ============================================================
          *
          * Publie le fichier JAR dans Nexus.
@@ -500,7 +569,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 7 : BUILDING OUR IMAGE
+         * Stage 15 : BUILDING BACKEND IMAGE
          * ============================================================
          *
          * Construit l'image Docker depuis backend/Dockerfile.
@@ -539,7 +608,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 8 : DEPLOY OUR IMAGE
+         * Stage 16 : PUBLISH BACKEND IMAGE
          * ============================================================
          *
          * Se connecte à Docker Hub et pousse les deux tags :
@@ -599,7 +668,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 9 : VERIFY DOCKER HUB IMAGE
+         * Stage 17 : VERIFY BACKEND DOCKER HUB IMAGE
          * ============================================================
          *
          * Vérifie que l'image peut réellement être récupérée
@@ -640,7 +709,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 10 : TEST AWS CREDENTIALS
+         * Stage 18 : TEST AWS CREDENTIALS
          * ============================================================
          *
          * Vérifie l'identité AWS du Learner Lab sans créer
@@ -674,7 +743,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 11 : DESTROY AWS INFRASTRUCTURE ONLY (OPTIONAL)
+         * Stage 19 : DESTROY AWS INFRASTRUCTURE ONLY (OPTIONAL)
          * ============================================================
          *
          * Ce stage n'est exécuté que si le paramètre de suppression seule
@@ -733,7 +802,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 12 : SETUP TERRAFORM
+         * Stage 20 : SETUP TERRAFORM
          * ============================================================
          *
          * Regroupe le cycle Terraform comme dans le pipeline de
@@ -793,7 +862,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 13 : UPDATE KUBECONFIG
+         * Stage 21 : UPDATE KUBECONFIG
          * ============================================================
          *
          * Configure kubectl pour le cluster créé par Terraform.

@@ -631,11 +631,15 @@ pipeline {
                             exit 1
                         }
 
-                        # 8. Test de santé depuis l'intérieur du cluster
+                        # 8. Test de santé : directement dans un pod du backend
+                        kubectl -n stationski exec deploy/backend -- \
+                            wget -qO- http://localhost:8087/stationSki/actuator/health
+
+                        # 8b. Test via le Service (traverse le réseau entre nœuds)
                         kubectl -n stationski delete pod curl-test --ignore-not-found
                         kubectl -n stationski run curl-test --rm -i --restart=Never \
                             --image=curlimages/curl --command -- \
-                            curl -sf http://backend:8087/stationSki/actuator/health
+                            curl -sf --max-time 20 http://backend:8087/stationSki/actuator/health
 
                         # 9. Preuve que Flyway a bien migré
                         kubectl -n stationski logs deploy/backend | grep -i -E "flyway|migrat" || true

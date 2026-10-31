@@ -17,6 +17,17 @@ pipeline {
             defaultValue: false,
             description: 'Supprimer toutes les ressources Terraform AWS et arrêter le pipeline sans les recréer.'
         )
+        booleanParam(
+            name: 'PUBLISH_MAVEN_RELEASE',
+            defaultValue: false,
+            description: 'Publier une version Maven Release dans Nexus après le déploiement et sa vérification.'
+        )
+        string(
+            name: 'RELEASE_VERSION',
+            defaultValue: '',
+            trim: true,
+            description: 'Version Maven Release à publier, au format X.Y.Z, par exemple 0.0.2.'
+        )
     }
 
     /*
@@ -124,6 +135,22 @@ pipeline {
                  * - les credentials Git configurés.
                  */
                 checkout scm
+            }
+        }
+
+        stage('VALIDATE MAVEN RELEASE PARAMETERS') {
+            when {
+                expression { params.PUBLISH_MAVEN_RELEASE }
+            }
+            steps {
+                script {
+                    if (params.DESTROY_AWS_INFRASTRUCTURE_ONLY) {
+                        error('A Maven Release cannot be published in destroy-only mode.')
+                    }
+                    if (!(params.RELEASE_VERSION ==~ /^[0-9]+[.][0-9]+[.][0-9]+$/)) {
+                        error('RELEASE_VERSION must use X.Y.Z format, for example 0.0.2.')
+                    }
+                }
             }
         }
 
@@ -515,7 +542,10 @@ pipeline {
          */
         stage('PUBLISH TO NEXUS') {
             when {
-                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+                expression {
+                    !params.DESTROY_AWS_INFRASTRUCTURE_ONLY &&
+                    !params.PUBLISH_MAVEN_RELEASE
+                }
             }
             steps {
                 /*
@@ -1064,6 +1094,47 @@ pipeline {
                             "http://$lb_hostname/stationSki/actuator/health/readiness"
                         echo "Frontend and backend API are reachable through the Classic Load Balancer."
                     '''
+                }
+            }
+        }
+
+        /* Publie une release uniquement après la réussite des vérifications AWS. */
+        stage('PUBLISH MAVEN RELEASE') {
+            when {
+                expression {
+                    !params.DESTROY_AWS_INFRASTRUCTURE_ONLY &&
+                    params.PUBLISH_MAVEN_RELEASE
+                }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'nexus-credentials',
+                        usernameVariable: 'NEXUS_USERNAME',
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )
+                ]) {
+                    configFileProvider([
+                        configFile(
+                            fileId: 'maven-settings',
+                            variable: 'MAVEN_SETTINGS'
+                        )
+                    ]) {
+                        dir('backend') {
+                            sh '''
+                                set -eu
+
+                                release_dir="$(mktemp -d)"
+                                trap 'rm -rf "$release_dir"' EXIT
+                                cp -a . "$release_dir/backend"
+                                cd "$release_dir/backend"
+
+                                mvn -B versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
+
+                                mvn -B deploy -DskipTests -s "$MAVEN_SETTINGS" -Dnexus.url="$NEXUS_URL"
+                            '''
+                        }
+                    }
                 }
             }
         }

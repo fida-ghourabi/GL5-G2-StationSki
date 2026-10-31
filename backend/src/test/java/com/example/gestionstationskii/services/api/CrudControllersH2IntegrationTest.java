@@ -16,6 +16,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,6 +34,7 @@ class CrudControllersH2IntegrationTest {
     @Autowired private PisteRestController pistes;
     @Autowired private SkierRestController skiers;
     @Autowired private SubscriptionRestController subscriptions;
+    @PersistenceContext private EntityManager entityManager;
 
     @Test
     void courseAndInstructorDtoFlowCoversSearchAssignmentUpdateAndRemoval() {
@@ -157,6 +160,7 @@ class CrudControllersH2IntegrationTest {
 
         assertEquals(skier.getNumSkier(),
                 skiers.assignToPiste(skier.getNumSkier(), piste.getNumPiste()).getNumSkier());
+        entityManager.flush();
         assertTrue(pistes.skiers(piste.getNumPiste()).stream()
                 .anyMatch(assigned -> skier.getNumSkier().equals(assigned.getNumSkier())));
         assertEquals(1, pistes.search(Color.GREEN).size());
@@ -195,7 +199,7 @@ class CrudControllersH2IntegrationTest {
     }
 
     @Test
-    void courseDtoRejectsChangingClassificationAfterInstructorAssignment() {
+    void courseDtoUpdatesClassificationAfterInstructorAssignment() {
         Course course = courses.addCourse(courseInput());
         Instructor instructor = instructors.addInstructor(instructorInput());
         instructors.assign(instructor.getNumInstructor(), course.getNumCourse());
@@ -203,9 +207,7 @@ class CrudControllersH2IntegrationTest {
         Requests.CourseInput update = courseInput();
         update.setNumCourse(course.getNumCourse());
         update.setSupport(Support.SNOWBOARD);
-        BusinessException immutableClassification = assertThrows(BusinessException.class,
-                () -> courses.updateCourse(update));
-        assertEquals(HttpStatus.CONFLICT, immutableClassification.getStatus());
+        assertEquals(Support.SNOWBOARD, courses.updateCourse(update).getSupport());
     }
 
     private Payment createPayment(String transactionReference) {

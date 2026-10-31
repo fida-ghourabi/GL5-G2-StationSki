@@ -125,7 +125,8 @@ class BusinessRulesTest {
         Skier skier = new Skier(); skier.setFirstName("Amina"); skier.setLastName("Test"); skier.setCity("Tunis"); skier.setDateOfBirth(LocalDate.of(2000, 1, 1));
         Subscription sub = new Subscription(); skier.setSubscription(sub);
         PlanningSlot slot = new PlanningSlot(); slot.setId(3L);
-        when(courses.findById(2L)).thenReturn(Optional.of(new Course()));
+        Course course = new Course(); course.setNumCourse(2L);
+        when(courses.findById(2L)).thenReturn(Optional.of(course));
         when(subscriptions.addSubscription(sub)).thenReturn(sub);
         when(skiers.save(skier)).thenAnswer(invocation -> { skier.setNumSkier(1L); return skier; });
         when(registrations.nextAvailableSlot(2L)).thenReturn(slot);

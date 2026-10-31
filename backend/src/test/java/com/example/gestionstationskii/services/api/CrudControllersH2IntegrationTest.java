@@ -166,11 +166,14 @@ class CrudControllersH2IntegrationTest {
                 .anyMatch(assigned -> skier.getNumSkier().equals(assigned.getNumSkier())));
         assertEquals(1, pistes.search(Color.GREEN).size());
 
+        Long skierId = skier.getNumSkier();
+        Long pisteId = piste.getNumPiste();
         BusinessException duplicateAssignment = assertThrows(BusinessException.class,
-                () -> skiers.assignToPiste(skier.getNumSkier(), piste.getNumPiste()));
+                () -> skiers.assignToPiste(skierId, pisteId));
         assertEquals(HttpStatus.CONFLICT, duplicateAssignment.getStatus());
+        Long linkedPisteId = piste.getNumPiste();
         BusinessException linkedPisteDeletion = assertThrows(BusinessException.class,
-                () -> pistes.deleteById(piste.getNumPiste()));
+                () -> pistes.deleteById(linkedPisteId));
         assertEquals(HttpStatus.CONFLICT, linkedPisteDeletion.getStatus());
     }
 
@@ -194,8 +197,9 @@ class CrudControllersH2IntegrationTest {
         Requests.RefundInput refund = new Requests.RefundInput();
         refund.setAmount(new BigDecimal("100.01"));
         refund.setReason("Too much");
+        Long paymentId = payment.getId();
         BusinessException excessiveRefund = assertThrows(BusinessException.class,
-                () -> payments.refund(payment.getId(), refund));
+                () -> payments.refund(paymentId, refund));
         assertEquals(HttpStatus.CONFLICT, excessiveRefund.getStatus());
     }
 

@@ -215,6 +215,62 @@ class CrudControllersH2IntegrationTest {
         assertEquals(Support.SNOWBOARD, courses.updateCourse(update).getSupport());
     }
 
+    @Test
+    void skierDtoRejectsInvalidPagination() {
+        BusinessException invalidPage = assertThrows(BusinessException.class,
+                () -> skiers.search("", "", -1, 10));
+        assertEquals(HttpStatus.BAD_REQUEST, invalidPage.getStatus());
+    }
+
+    @Test
+    void pisteDtoDeletesUnassignedPiste() {
+        Piste piste = pistes.addPiste(pisteInput());
+        Long pisteId = piste.getNumPiste();
+        pistes.deleteById(pisteId);
+
+        BusinessException missingPiste = assertThrows(BusinessException.class,
+                () -> pistes.getById(pisteId));
+        assertEquals(HttpStatus.NOT_FOUND, missingPiste.getStatus());
+    }
+
+    @Test
+    void instructorDtoRejectsAssigningCourseAlreadyAssignedToAnotherInstructor() {
+        Course course = courses.addCourse(courseInput());
+        Instructor first = instructors.addInstructor(instructorInput());
+        Instructor second = instructors.addInstructor(instructorInput());
+        instructors.assign(first.getNumInstructor(), course.getNumCourse());
+
+        Long secondInstructorId = second.getNumInstructor();
+        Long courseId = course.getNumCourse();
+        BusinessException alreadyAssigned = assertThrows(BusinessException.class,
+                () -> instructors.assign(secondInstructorId, courseId));
+        assertEquals(HttpStatus.CONFLICT, alreadyAssigned.getStatus());
+    }
+
+    @Test
+    void subscriptionDtoRejectsReversedDateRange() {
+        BusinessException invalidRange = assertThrows(BusinessException.class,
+                () -> subscriptions.getSubscriptionsByDates(
+                        LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1)));
+        assertEquals(HttpStatus.BAD_REQUEST, invalidRange.getStatus());
+    }
+
+    @Test
+    void paymentDtoAllowsIdempotentPendingStatusAndRejectsRefundBeforePayment() {
+        Payment payment = createPayment("DTO-PENDING-REFUND");
+        Requests.PaymentState pending = new Requests.PaymentState();
+        pending.setStatus(PaymentStatus.PENDING);
+        assertEquals(PaymentStatus.PENDING, payments.status(payment.getId(), pending).getStatus());
+
+        Requests.RefundInput refund = new Requests.RefundInput();
+        refund.setAmount(new BigDecimal("10.00"));
+        refund.setReason("Not paid");
+        Long paymentId = payment.getId();
+        BusinessException notPaid = assertThrows(BusinessException.class,
+                () -> payments.refund(paymentId, refund));
+        assertEquals(HttpStatus.CONFLICT, notPaid.getStatus());
+    }
+
     private Payment createPayment(String transactionReference) {
         Requests.SkierInput skierInput = skierInput();
         skierInput.setSubscription(subscriptionInput(

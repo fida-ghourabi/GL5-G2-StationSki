@@ -271,6 +271,74 @@ class CrudControllersH2IntegrationTest {
         assertEquals(HttpStatus.CONFLICT, notPaid.getStatus());
     }
 
+    @Test
+    void skierDtoUpdatesAndRemovesSkierWithoutHistory() {
+        Skier skier = skiers.addSkier(skierInput());
+        Requests.SkierInput update = skierInput();
+        update.setNumSkier(skier.getNumSkier());
+        update.setCity("Sousse");
+        assertEquals("Sousse", skiers.update(update).getCity());
+        assertEquals(1, skiers.getAllSkiers().size());
+
+        Long skierId = skier.getNumSkier();
+        skiers.deleteById(skierId);
+        BusinessException deletedSkier = assertThrows(BusinessException.class,
+                () -> skiers.getById(skierId));
+        assertEquals(HttpStatus.NOT_FOUND, deletedSkier.getStatus());
+    }
+
+    @Test
+    void instructorDtoRejectsRemovingInstructorStillAssignedToCourse() {
+        Course course = courses.addCourse(courseInput());
+        Instructor instructor = instructors.addInstructor(instructorInput());
+        instructors.assign(instructor.getNumInstructor(), course.getNumCourse());
+
+        Long instructorId = instructor.getNumInstructor();
+        BusinessException assignedInstructor = assertThrows(BusinessException.class,
+                () -> instructors.delete(instructorId));
+        assertEquals(HttpStatus.CONFLICT, assignedInstructor.getStatus());
+    }
+
+    @Test
+    void courseDtoRejectsDeletingCourseAssignedToInstructor() {
+        Course course = courses.addCourse(courseInput());
+        Instructor instructor = instructors.addInstructor(instructorInput());
+        instructors.assign(instructor.getNumInstructor(), course.getNumCourse());
+
+        Long courseId = course.getNumCourse();
+        BusinessException assignedCourse = assertThrows(BusinessException.class,
+                () -> courses.delete(courseId));
+        assertEquals(HttpStatus.CONFLICT, assignedCourse.getStatus());
+    }
+
+    @Test
+    void subscriptionDtoRejectsDeletingSubscriptionAssignedToSkier() {
+        Requests.SkierInput skierInput = skierInput();
+        skierInput.setSubscription(subscriptionInput(
+                TypeSubscription.ANNUAL, LocalDate.of(2026, 1, 1), 250F));
+        Skier skier = skiers.addSkier(skierInput);
+
+        Long subscriptionId = skier.getSubscription().getNumSub();
+        BusinessException assignedSubscription = assertThrows(BusinessException.class,
+                () -> subscriptions.delete(subscriptionId));
+        assertEquals(HttpStatus.CONFLICT, assignedSubscription.getStatus());
+    }
+
+    @Test
+    void paymentDtoAllowsFailedStatusAndRejectsTransitionFromFailed() {
+        Payment payment = createPayment("DTO-FAILED-STATUS");
+        Requests.PaymentState failed = new Requests.PaymentState();
+        failed.setStatus(PaymentStatus.FAILED);
+        assertEquals(PaymentStatus.FAILED, payments.status(payment.getId(), failed).getStatus());
+
+        Requests.PaymentState paid = new Requests.PaymentState();
+        paid.setStatus(PaymentStatus.PAID);
+        Long paymentId = payment.getId();
+        BusinessException invalidTransition = assertThrows(BusinessException.class,
+                () -> payments.status(paymentId, paid));
+        assertEquals(HttpStatus.CONFLICT, invalidTransition.getStatus());
+    }
+
     private Payment createPayment(String transactionReference) {
         Requests.SkierInput skierInput = skierInput();
         skierInput.setSubscription(subscriptionInput(

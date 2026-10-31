@@ -95,7 +95,7 @@ pipeline {
         choice(name: 'NEXUS_TARGET', choices: ['snapshot', 'release', 'both'], description: 'Type de publication Nexus : snapshot, release ou les deux.')
         string(name: 'RELEASE_VERSION', defaultValue: '1.0', description: 'Début de version pour la release Nexus. Le numéro de build est ajouté automatiquement : 1.0 donne 1.0.<numéro du build> (ex. 1.0.41).')
         string(name: 'NEXUS_RELEASE_URL', defaultValue: 'http://nexus:8081/repository/maven-releases/', description: 'URL du dépôt Maven releases Nexus.')
-        string(name: 'NOTIFY_EMAIL', defaultValue: 'ton.email@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
+        string(name: 'NOTIFY_EMAIL', defaultValue: 'hajerbennacer03@gmail.com', description: 'Adresse qui reçoit les notifications email du build.')
     }
 
     environment {

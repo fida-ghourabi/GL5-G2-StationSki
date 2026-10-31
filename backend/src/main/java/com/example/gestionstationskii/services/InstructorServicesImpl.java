@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,7 +51,7 @@ public class InstructorServicesImpl implements IInstructorServices {
     public Instructor updateInstructor(Instructor instructor) {
         log.debug("Updating instructor id={}", instructor.getNumInstructor());
         validate(instructor);
-        Instructor current = retrieveInstructor(instructor.getNumInstructor());
+        Instructor current = findInstructor(instructor.getNumInstructor());
         current.setFirstName(instructor.getFirstName());
         current.setLastName(instructor.getLastName());
         current.setDateOfHire(instructor.getDateOfHire());
@@ -60,6 +63,10 @@ public class InstructorServicesImpl implements IInstructorServices {
     @Override
     @Transactional(readOnly = true)
     public Instructor retrieveInstructor(Long numInstructor) {
+        return findInstructor(numInstructor);
+    }
+
+    private Instructor findInstructor(Long numInstructor) {
         log.debug("Retrieving instructor id={}", numInstructor);
         Checks.id(numInstructor);
         return instructorRepository.findById(numInstructor).orElseThrow(() -> {
@@ -82,7 +89,7 @@ public class InstructorServicesImpl implements IInstructorServices {
                 instructor.getFirstName(), instructor.getLastName(), instructor.getDateOfHire());
         Checks.text(instructor.getFirstName(), "Prénom");
         Checks.text(instructor.getLastName(), "Nom");
-        Checks.require(instructor.getDateOfHire() != null && !instructor.getDateOfHire().isAfter(java.time.LocalDate.now()),
+        Checks.require(instructor.getDateOfHire() != null && !instructor.getDateOfHire().isAfter(LocalDate.now(ZoneId.systemDefault())),
                 "Date d'embauche présente ou passée requise");
     }
 
@@ -95,7 +102,7 @@ public class InstructorServicesImpl implements IInstructorServices {
             log.warn("Assignment refused: course id={} not found", courseId);
             return BusinessException.missing("Cours");
         });
-        Instructor instructor = retrieveInstructor(id);
+        Instructor instructor = findInstructor(id);
         if (!instructorRepository.findByCourses_NumCourse(courseId).isEmpty()) {
             log.warn("Assignment refused: course id={} already has an instructor", courseId);
             throw BusinessException.conflict("Cours déjà associé à un moniteur");
@@ -114,11 +121,11 @@ public class InstructorServicesImpl implements IInstructorServices {
             log.warn("Unassignment refused: course id={} not found", courseId);
             return BusinessException.missing("Cours");
         });
-        Instructor instructor = retrieveInstructor(id);
+        Instructor instructor = findInstructor(id);
         if (slotRepository.findAll().stream().anyMatch(s -> s.getCourse().getNumCourse().equals(courseId)
                 && s.getInstructor().getNumInstructor().equals(id)
                 && s.getStatus() != SlotStatus.CANCELLED
-                && s.getEndTime().isAfter(java.time.LocalDateTime.now()))) {
+                && s.getEndTime().isAfter(LocalDateTime.now(ZoneId.systemDefault())))) {
             log.warn("Unassignment refused: instructor id={} has future slots for course id={}", id, courseId);
             throw BusinessException.conflict("Annuler les créneaux futurs avant de retirer le cours");
         }
@@ -134,7 +141,7 @@ public class InstructorServicesImpl implements IInstructorServices {
     @Override
     public void removeInstructor(Long id) {
         log.debug("Removing instructor id={}", id);
-        Instructor instructor = retrieveInstructor(id);
+        Instructor instructor = findInstructor(id);
         if (!instructor.getCourses().isEmpty()
                 || slotRepository.existsByInstructor_NumInstructor(id)
                 || availabilityRepository.existsByInstructor_NumInstructor(id)) {
@@ -149,7 +156,7 @@ public class InstructorServicesImpl implements IInstructorServices {
     @Transactional(readOnly = true)
     public Set<Course> courses(Long id) {
         log.debug("Retrieving courses of instructor id={}", id);
-        Set<Course> courses = retrieveInstructor(id).getCourses();
+        Set<Course> courses = findInstructor(id).getCourses();
         log.info("{} course(s) found for instructor id={}", courses.size(), id);
         return courses;
     }

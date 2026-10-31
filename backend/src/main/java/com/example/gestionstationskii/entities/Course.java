@@ -32,11 +32,10 @@ public class Course implements Serializable {
 	Support support;
 	Float price;
 	/** Legacy display value; precise scheduling is stored in PlanningSlot. */
-	@Deprecated
 	int timeSlot;
 
 	@JsonIgnore
 	@OneToMany(mappedBy= "course")
-	Set<Registration> registrations;
+	private Set<Registration> registrations;
 
 }

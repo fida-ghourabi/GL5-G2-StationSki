@@ -5,6 +5,7 @@ import com.example.gestionstationskii.services.ICourseServices;
 import com.example.gestionstationskii.entities.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,7 +27,7 @@ public class CourseRestController {
     @Operation(summary = "Filtrer les cours par type, support et niveau")
     @GetMapping("/search")
     public List<Course> search(@RequestParam(required = false) TypeCourse type,
-            @RequestParam(required = false) Support support, @RequestParam(required = false) Integer level) {
+                               @RequestParam(required = false) Support support, @RequestParam(required = false) Integer level) {
         return courseServices.search(type, support, level);
     }
     @Operation(summary = "Consulter l'historique des inscriptions d'un cours")
@@ -43,8 +44,8 @@ public class CourseRestController {
 
     @Operation(description = "Add Course")
     @PostMapping("/add")
-    public Course addCourse(@RequestBody Course course){
-        return  courseServices.addCourse(course);
+    public Course addCourse(@RequestBody Requests.CourseInput course){
+        return  courseServices.addCourse(course.toEntity());
     }
 
     @Operation(description = "Retrieve all Courses")
@@ -55,8 +56,8 @@ public class CourseRestController {
 
     @Operation(description = "Update Course ")
     @PutMapping("/update")
-    public Course updateCourse(@RequestBody Course course){
-        return  courseServices.updateCourse(course);
+    public Course updateCourse(@RequestBody Requests.CourseInput course){
+        return  courseServices.updateCourse(course.toEntity());
     }
 
     @Operation(description = "Retrieve Course by Id")

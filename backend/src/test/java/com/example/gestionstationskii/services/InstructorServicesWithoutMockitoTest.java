@@ -6,17 +6,37 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@Testcontainers
 @Transactional
 class InstructorServicesWithoutMockitoTest {
+
+    @Container
+    private static final MySQLContainer<?> MYSQL =
+            new MySQLContainer<>("mysql:8.0.33")
+                    .withDatabaseName("station_test")
+                    .withUsername("test")
+                    .withPassword("test");
+
+    @DynamicPropertySource
+    static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
+    }
 
     @Autowired
     private IInstructorServices instructorServices;
@@ -68,6 +88,11 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void retrieveAllInstructorsReturnsEmptyWhenNoInstructor() {
+        assertTrue(instructorServices.retrieveAllInstructors().isEmpty());
+    }
+
+    @Test
     void updateInstructorChangesNames() {
         Instructor saved = instructorServices.addInstructor(buildInstructor("Ali", "A"));
         saved.setFirstName("Omar");
@@ -80,12 +105,27 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void updateInstructorThrowsWhenMissing() {
+        Instructor unknown = buildInstructor("Omar", "Z");
+        unknown.setNumInstructor(999999L);
+
+        assertThrows(BusinessException.class, () -> instructorServices.updateInstructor(unknown));
+    }
+
+    @Test
     void searchFindsInstructorByName() {
         instructorServices.addInstructor(buildInstructor("Ali", "Ben Salah"));
         instructorServices.addInstructor(buildInstructor("Sami", "Trabelsi"));
 
         assertEquals(1, instructorServices.search("trabelsi").size());
         assertEquals(2, instructorServices.search("").size());
+    }
+
+    @Test
+    void searchReturnsEmptyWhenNoMatch() {
+        instructorServices.addInstructor(buildInstructor("Ali", "Ben Salah"));
+
+        assertTrue(instructorServices.search("zzzzzz").isEmpty());
     }
 
     @Test
@@ -100,6 +140,12 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void addInstructorAndAssignToCourseThrowsWhenCourseMissing() {
+        assertThrows(BusinessException.class, () ->
+                instructorServices.addInstructorAndAssignToCourse(buildInstructor("Ali", "A"), 999999L));
+    }
+
+    @Test
     void removeInstructorDeletesPersistedInstructor() {
         Instructor saved = instructorServices.addInstructor(buildInstructor("Ali", "A"));
         Long id = saved.getNumInstructor();
@@ -107,6 +153,11 @@ class InstructorServicesWithoutMockitoTest {
         instructorServices.removeInstructor(id);
 
         assertFalse(instructorRepository.findById(id).isPresent());
+    }
+
+    @Test
+    void removeInstructorThrowsWhenMissing() {
+        assertThrows(BusinessException.class, () -> instructorServices.removeInstructor(999999L));
     }
 
     private Instructor buildInstructor(String firstName, String lastName) {

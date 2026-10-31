@@ -6,15 +6,35 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@Testcontainers
 @Transactional
 class CourseServicesWithoutMockitoTest {
+
+    @Container
+    private static final MySQLContainer<?> MYSQL =
+            new MySQLContainer<>("mysql:8.0.33")
+                    .withDatabaseName("station_test")
+                    .withUsername("test")
+                    .withPassword("test");
+
+    @DynamicPropertySource
+    static void configureDatabase(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
+    }
 
     @Autowired
     private ICourseServices courseServices;
@@ -59,6 +79,11 @@ class CourseServicesWithoutMockitoTest {
     }
 
     @Test
+    void retrieveAllCoursesReturnsEmptyWhenNoCourse() {
+        assertTrue(courseServices.retrieveAllCourses().isEmpty());
+    }
+
+    @Test
     void updateCourseChangesPrice() {
         Course saved = courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
         saved.setPrice(250F);
@@ -67,6 +92,14 @@ class CourseServicesWithoutMockitoTest {
 
         assertEquals(250F, updated.getPrice());
         assertEquals(250F, courseRepository.findById(saved.getNumCourse()).get().getPrice());
+    }
+
+    @Test
+    void updateCourseThrowsWhenMissing() {
+        Course unknown = buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1);
+        unknown.setNumCourse(999999L);
+
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(unknown));
     }
 
     @Test
@@ -80,6 +113,14 @@ class CourseServicesWithoutMockitoTest {
     }
 
     @Test
+    void searchWithoutFilterReturnsAllCourses() {
+        courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
+        courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SNOWBOARD, 2));
+
+        assertEquals(2, courseServices.search(null, null, null).size());
+    }
+
+    @Test
     void removeCourseDeletesPersistedCourse() {
         Course saved = courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
         Long id = saved.getNumCourse();
@@ -87,6 +128,11 @@ class CourseServicesWithoutMockitoTest {
         courseServices.removeCourse(id);
 
         assertFalse(courseRepository.findById(id).isPresent());
+    }
+
+    @Test
+    void removeCourseThrowsWhenMissing() {
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(999999L));
     }
 
     private Course buildCourse(TypeCourse type, Support support, int level) {

@@ -11,10 +11,10 @@ import java.util.List;
 public class PaymentRestController {
     private final IPaymentServices service;
     @Operation(summary = "Enregistrer un paiement local au statut PENDING") @PostMapping
-    public Payment record(@RequestBody Requests.PaymentInput input) {
+    public Payment recordPayment(@RequestBody Requests.PaymentInput input) {
         log.debug("Requête d'enregistrement de paiement reçue : skieur={}, abonnement={}",
                 input.getSkierId(), input.getSubscriptionId());
-        Payment payment = service.record(input);
+        Payment payment = service.recordPayment(input);
         log.info("Requête d'enregistrement de paiement terminée : id={}", payment.getId());
         return payment;
     }

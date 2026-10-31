@@ -3,19 +3,21 @@ package com.example.gestionstationskii.services;
 import com.example.gestionstationskii.dto.Requests;
 import com.example.gestionstationskii.entities.*;
 import com.example.gestionstationskii.repositories.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
+
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -52,7 +54,10 @@ class PaymentServicesWithoutMockitoTest {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create");
-        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.MySQL8Dialect");
+        registry.add(
+                "spring.jpa.properties.hibernate.dialect",
+                () -> "org.hibernate.dialect.MySQL8Dialect"
+        );
     }
 
     @BeforeEach
@@ -65,76 +70,126 @@ class PaymentServicesWithoutMockitoTest {
 
     @Test
     void recordsPaymentAndReadsItBySkierAndSubscription() {
-        TestData data = createTestData();
-        Requests.PaymentInput input = paymentInput(data.skier.getNumSkier(), data.subscription.getNumSub());
 
-        Payment saved = paymentService.record(input);
+        TestData data = createTestData();
+
+        Requests.PaymentInput input = paymentInput(
+                data.skier.getNumSkier(),
+                data.subscription.getNumSub()
+        );
+
+        Payment saved = paymentService.recordPayment(input);
 
         assertNotNull(saved.getId());
         assertEquals(PaymentStatus.PENDING, saved.getStatus());
-        assertEquals(1, paymentService.bySkier(data.skier.getNumSkier()).size());
-        assertEquals(1, paymentService.bySubscription(data.subscription.getNumSub()).size());
+
+        assertEquals(
+                1,
+                paymentService.bySkier(data.skier.getNumSkier()).size()
+        );
+
+        assertEquals(
+                1,
+                paymentService.bySubscription(data.subscription.getNumSub()).size()
+        );
     }
 
     @Test
     void changesStatusAndCreatesRefund() {
+
         TestData data = createTestData();
-        Payment payment = paymentService.record(paymentInput(
-                data.skier.getNumSkier(),
-                data.subscription.getNumSub()
-        ));
+
+        Payment payment = paymentService.recordPayment(
+                paymentInput(
+                        data.skier.getNumSkier(),
+                        data.subscription.getNumSub()
+                )
+        );
 
         Requests.PaymentState state = new Requests.PaymentState();
         state.setStatus(PaymentStatus.PAID);
+
         paymentService.changeStatus(payment.getId(), state);
 
         Requests.RefundInput refund = new Requests.RefundInput();
         refund.setAmount(new BigDecimal("25.00"));
         refund.setReason("Customer request");
+
         paymentService.refund(payment.getId(), refund);
 
-        assertEquals(PaymentStatus.PARTIALLY_REFUNDED,
-                paymentRepository.findById(payment.getId()).orElseThrow().getStatus());
-        assertEquals(1, paymentService.refunds(payment.getId()).size());
+        Payment persistedPayment = paymentRepository
+                .findById(payment.getId())
+                .orElseThrow(() -> new AssertionError(
+                        "Le paiement devrait exister dans la base de données"
+                ));
+
+        assertEquals(
+                PaymentStatus.PARTIALLY_REFUNDED,
+                persistedPayment.getStatus()
+        );
+
+        assertEquals(
+                1,
+                paymentService.refunds(payment.getId()).size()
+        );
     }
 
     @Test
     void buildsReceiptFromPersistedPayment() {
-        TestData data = createTestData();
-        Payment payment = paymentService.record(paymentInput(
-                data.skier.getNumSkier(),
-                data.subscription.getNumSub()
-        ));
 
-        assertEquals(payment.getReceiptNumber(),
-                paymentService.receipt(payment.getId()).getReceiptNumber());
+        TestData data = createTestData();
+
+        Payment payment = paymentService.recordPayment(
+                paymentInput(
+                        data.skier.getNumSkier(),
+                        data.subscription.getNumSub()
+                )
+        );
+
+        assertEquals(
+                payment.getReceiptNumber(),
+                paymentService.receipt(payment.getId()).getReceiptNumber()
+        );
     }
 
     private TestData createTestData() {
+
         Subscription subscription = new Subscription();
+
         subscription.setTypeSub(TypeSubscription.MONTHLY);
         subscription.setStartDate(java.time.LocalDate.of(2026, 1, 1));
         subscription.setPrice(50F);
+
         subscription = subscriptionRepository.save(subscription);
 
         Skier skier = new Skier();
+
         skier.setFirstName("Amina");
         skier.setLastName("Test");
         skier.setSubscription(subscription);
+
         skier = skierRepository.save(skier);
+
         return new TestData(skier, subscription);
     }
 
-    private static Requests.PaymentInput paymentInput(Long skierId, Long subscriptionId) {
+    private static Requests.PaymentInput paymentInput(
+            Long skierId,
+            Long subscriptionId
+    ) {
+
         Requests.PaymentInput input = new Requests.PaymentInput();
+
         input.setSkierId(skierId);
         input.setSubscriptionId(subscriptionId);
         input.setAmount(new BigDecimal("100.00"));
         input.setMethod(PaymentMethod.CARD);
+
         return input;
     }
 
     private static class TestData {
+
         private final Skier skier;
         private final Subscription subscription;
 

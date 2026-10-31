@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -23,7 +24,7 @@ public class ApiExceptionHandler {
         private final String path;
     }
     private ResponseEntity<ErrorResponse> error(HttpStatus status, String message, HttpServletRequest request) {
-        return ResponseEntity.status(status).body(new ErrorResponse(LocalDateTime.now(), status.value(), message, request.getRequestURI()));
+        return ResponseEntity.status(status).body(new ErrorResponse(LocalDateTime.now(ZoneId.systemDefault()), status.value(), message, request.getRequestURI()));
     }
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> business(BusinessException ex, HttpServletRequest request) {

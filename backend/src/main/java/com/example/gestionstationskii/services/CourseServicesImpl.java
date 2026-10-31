@@ -72,6 +72,10 @@ public class CourseServicesImpl implements ICourseServices {
     @Override
     @Transactional(readOnly = true)
     public Course retrieveCourse(Long numCourse) {
+        return findCourse(numCourse);
+    }
+
+    private Course findCourse(Long numCourse) {
         log.debug("Retrieving course id={}", numCourse);
         Checks.id(numCourse);
         return courseRepository.findById(numCourse).orElseThrow(() -> {
@@ -93,7 +97,7 @@ public class CourseServicesImpl implements ICourseServices {
     @Override
     public void removeCourse(Long id) {
         log.debug("Removing course id={}", id);
-        Course course = retrieveCourse(id);
+        Course course = findCourse(id);
         if (registrationRepository.existsByCourse_NumCourse(id)
                 || slotRepository.existsByCourse_NumCourse(id)
                 || !instructorRepository.findByCourses_NumCourse(id).isEmpty()) {
@@ -121,8 +125,12 @@ public class CourseServicesImpl implements ICourseServices {
     @Override
     @Transactional(readOnly = true)
     public List<Registration> registrations(Long id) {
+        return findRegistrations(id);
+    }
+
+    private List<Registration> findRegistrations(Long id) {
         log.debug("Retrieving registrations of course id={}", id);
-        retrieveCourse(id);
+        findCourse(id);
         List<Registration> registrations = registrationRepository.findByCourse_NumCourse(id);
         log.info("{} registration(s) found for course id={}", registrations.size(), id);
         return registrations;
@@ -132,7 +140,7 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public long participants(Long id) {
         log.debug("Counting participants of course id={}", id);
-        long count = registrations(id).stream()
+        long count = findRegistrations(id).stream()
                 .filter(r -> !r.isCancelled())
                 .map(r -> r.getSkier().getNumSkier())
                 .distinct()
@@ -145,7 +153,7 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public List<Instructor> instructors(Long id) {
         log.debug("Retrieving instructors of course id={}", id);
-        retrieveCourse(id);
+        findCourse(id);
         List<Instructor> instructors = instructorRepository.findByCourses_NumCourse(id);
         log.info("{} instructor(s) found for course id={}", instructors.size(), id);
         return instructors;

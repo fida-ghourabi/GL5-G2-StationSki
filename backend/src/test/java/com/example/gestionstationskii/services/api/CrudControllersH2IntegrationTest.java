@@ -249,9 +249,10 @@ class CrudControllersH2IntegrationTest {
 
     @Test
     void subscriptionDtoRejectsReversedDateRange() {
+        LocalDate startDate = LocalDate.of(2026, 2, 1);
+        LocalDate endDate = LocalDate.of(2026, 1, 1);
         BusinessException invalidRange = assertThrows(BusinessException.class,
-                () -> subscriptions.getSubscriptionsByDates(
-                        LocalDate.of(2026, 2, 1), LocalDate.of(2026, 1, 1)));
+                () -> subscriptions.getSubscriptionsByDates(startDate, endDate));
         assertEquals(HttpStatus.BAD_REQUEST, invalidRange.getStatus());
     }
 
@@ -337,6 +338,77 @@ class CrudControllersH2IntegrationTest {
         BusinessException invalidTransition = assertThrows(BusinessException.class,
                 () -> payments.status(paymentId, paid));
         assertEquals(HttpStatus.CONFLICT, invalidTransition.getStatus());
+    }
+
+    @Test
+    void skierDtoRejectsAssigningOneSubscriptionToTwoSkiers() {
+        Requests.SkierInput firstInput = skierInput();
+        firstInput.setSubscription(subscriptionInput(
+                TypeSubscription.MONTHLY, LocalDate.of(2026, 4, 1), 60F));
+        Skier first = skiers.addSkier(firstInput);
+
+        Requests.SkierInput secondInput = skierInput();
+        Requests.SubscriptionInput existingSubscription = subscriptionInput(
+                TypeSubscription.MONTHLY, LocalDate.of(2026, 4, 1), 60F);
+        existingSubscription.setNumSub(first.getSubscription().getNumSub());
+        secondInput.setSubscription(existingSubscription);
+        BusinessException alreadyAssigned = assertThrows(BusinessException.class,
+                () -> skiers.addSkier(secondInput));
+        assertEquals(HttpStatus.CONFLICT, alreadyAssigned.getStatus());
+    }
+
+    @Test
+    void instructorDtoRejectsUnassigningUnlinkedCourse() {
+        Course course = courses.addCourse(courseInput());
+        Instructor instructor = instructors.addInstructor(instructorInput());
+        Long instructorId = instructor.getNumInstructor();
+        Long courseId = course.getNumCourse();
+
+        BusinessException missingAssociation = assertThrows(BusinessException.class,
+                () -> instructors.unassign(instructorId, courseId));
+        assertEquals(HttpStatus.CONFLICT, missingAssociation.getStatus());
+    }
+
+    @Test
+    void subscriptionDtoCannotBeDeletedAfterPaymentExists() {
+        Payment payment = createPayment("DTO-SUBSCRIPTION-IMMUTABLE");
+        Long subscriptionId = payment.getSubscription().getNumSub();
+
+        BusinessException paidSubscription = assertThrows(BusinessException.class,
+                () -> subscriptions.delete(subscriptionId));
+        assertEquals(HttpStatus.CONFLICT, paidSubscription.getStatus());
+    }
+
+    @Test
+    void paymentDtoRejectsSubscriptionOwnedByAnotherSkier() {
+        Payment payment = createPayment("DTO-OWNER-CHECK");
+        Requests.SkierInput otherSkierInput = skierInput();
+        otherSkierInput.setSubscription(subscriptionInput(
+                TypeSubscription.ANNUAL, LocalDate.of(2026, 5, 1), 300F));
+        Skier otherSkier = skiers.addSkier(otherSkierInput);
+
+        Requests.PaymentInput mismatched = new Requests.PaymentInput();
+        mismatched.setSkierId(otherSkier.getNumSkier());
+        mismatched.setSubscriptionId(payment.getSubscription().getNumSub());
+        mismatched.setAmount(new BigDecimal("100.00"));
+        mismatched.setMethod(PaymentMethod.CARD);
+        BusinessException ownershipMismatch = assertThrows(BusinessException.class,
+                () -> payments.recordPayment(mismatched));
+        assertEquals(HttpStatus.CONFLICT, ownershipMismatch.getStatus());
+    }
+
+    @Test
+    void paymentDtoCanRefundFullAmount() {
+        Payment payment = createPayment("DTO-FULL-REFUND");
+        Requests.PaymentState paid = new Requests.PaymentState();
+        paid.setStatus(PaymentStatus.PAID);
+        payments.status(payment.getId(), paid);
+
+        Requests.RefundInput refund = new Requests.RefundInput();
+        refund.setAmount(new BigDecimal("100.00"));
+        refund.setReason("Full refund");
+        PaymentStatus status = payments.refund(payment.getId(), refund).getPayment().getStatus();
+        assertEquals(PaymentStatus.REFUNDED, status);
     }
 
     private Payment createPayment(String transactionReference) {

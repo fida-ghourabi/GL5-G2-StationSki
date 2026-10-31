@@ -89,7 +89,7 @@ class PlanningServicesIntegrationTest {
         assertThrows(BusinessException.class, () -> service.availability(987654L));
     }
 
-    /** 4. getReturnsSlotAndRejectsMissingSlot */
+    /** 4. */
     @Test
     void getReturnsSlotAndRejectsMissingSlot() {
         Fixture fixture = createFixture();

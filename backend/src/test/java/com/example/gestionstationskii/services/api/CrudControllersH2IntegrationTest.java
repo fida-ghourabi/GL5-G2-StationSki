@@ -161,6 +161,7 @@ class CrudControllersH2IntegrationTest {
         assertEquals(skier.getNumSkier(),
                 skiers.assignToPiste(skier.getNumSkier(), piste.getNumPiste()).getNumSkier());
         entityManager.flush();
+        entityManager.clear();
         assertTrue(pistes.skiers(piste.getNumPiste()).stream()
                 .anyMatch(assigned -> skier.getNumSkier().equals(assigned.getNumSkier())));
         assertEquals(1, pistes.search(Color.GREEN).size());

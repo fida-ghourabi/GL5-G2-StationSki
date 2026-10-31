@@ -1127,7 +1127,7 @@ EOF
         success {
 
             emailext(
-                to: 'ton.email@gmail.com',
+                to: 'saharsaidani8@gmail.com',
 
                 subject: "SUCCES : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
 
@@ -1146,7 +1146,7 @@ ${env.BUILD_URL}
         failure {
 
             emailext(
-                to: 'ton.email@gmail.com',
+                to: 'saharsaidani8@gmail.com',
 
                 subject: "ECHEC : ${env.JOB_NAME} #${env.BUILD_NUMBER}",
 

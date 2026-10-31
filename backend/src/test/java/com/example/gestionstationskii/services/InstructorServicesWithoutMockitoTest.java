@@ -88,6 +88,11 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void retrieveAllInstructorsReturnsEmptyWhenNoInstructor() {
+        assertTrue(instructorServices.retrieveAllInstructors().isEmpty());
+    }
+
+    @Test
     void updateInstructorChangesNames() {
         Instructor saved = instructorServices.addInstructor(buildInstructor("Ali", "A"));
         saved.setFirstName("Omar");
@@ -100,12 +105,27 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void updateInstructorThrowsWhenMissing() {
+        Instructor unknown = buildInstructor("Omar", "Z");
+        unknown.setNumInstructor(999999L);
+
+        assertThrows(BusinessException.class, () -> instructorServices.updateInstructor(unknown));
+    }
+
+    @Test
     void searchFindsInstructorByName() {
         instructorServices.addInstructor(buildInstructor("Ali", "Ben Salah"));
         instructorServices.addInstructor(buildInstructor("Sami", "Trabelsi"));
 
         assertEquals(1, instructorServices.search("trabelsi").size());
         assertEquals(2, instructorServices.search("").size());
+    }
+
+    @Test
+    void searchReturnsEmptyWhenNoMatch() {
+        instructorServices.addInstructor(buildInstructor("Ali", "Ben Salah"));
+
+        assertTrue(instructorServices.search("zzzzzz").isEmpty());
     }
 
     @Test
@@ -120,6 +140,12 @@ class InstructorServicesWithoutMockitoTest {
     }
 
     @Test
+    void addInstructorAndAssignToCourseThrowsWhenCourseMissing() {
+        assertThrows(BusinessException.class, () ->
+                instructorServices.addInstructorAndAssignToCourse(buildInstructor("Ali", "A"), 999999L));
+    }
+
+    @Test
     void removeInstructorDeletesPersistedInstructor() {
         Instructor saved = instructorServices.addInstructor(buildInstructor("Ali", "A"));
         Long id = saved.getNumInstructor();
@@ -127,6 +153,11 @@ class InstructorServicesWithoutMockitoTest {
         instructorServices.removeInstructor(id);
 
         assertFalse(instructorRepository.findById(id).isPresent());
+    }
+
+    @Test
+    void removeInstructorThrowsWhenMissing() {
+        assertThrows(BusinessException.class, () -> instructorServices.removeInstructor(999999L));
     }
 
     private Instructor buildInstructor(String firstName, String lastName) {

@@ -79,6 +79,11 @@ class CourseServicesWithoutMockitoTest {
     }
 
     @Test
+    void retrieveAllCoursesReturnsEmptyWhenNoCourse() {
+        assertTrue(courseServices.retrieveAllCourses().isEmpty());
+    }
+
+    @Test
     void updateCourseChangesPrice() {
         Course saved = courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
         saved.setPrice(250F);
@@ -87,6 +92,14 @@ class CourseServicesWithoutMockitoTest {
 
         assertEquals(250F, updated.getPrice());
         assertEquals(250F, courseRepository.findById(saved.getNumCourse()).get().getPrice());
+    }
+
+    @Test
+    void updateCourseThrowsWhenMissing() {
+        Course unknown = buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1);
+        unknown.setNumCourse(999999L);
+
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(unknown));
     }
 
     @Test
@@ -100,6 +113,14 @@ class CourseServicesWithoutMockitoTest {
     }
 
     @Test
+    void searchWithoutFilterReturnsAllCourses() {
+        courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
+        courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SNOWBOARD, 2));
+
+        assertEquals(2, courseServices.search(null, null, null).size());
+    }
+
+    @Test
     void removeCourseDeletesPersistedCourse() {
         Course saved = courseServices.addCourse(buildCourse(TypeCourse.INDIVIDUAL, Support.SKI, 1));
         Long id = saved.getNumCourse();
@@ -107,6 +128,11 @@ class CourseServicesWithoutMockitoTest {
         courseServices.removeCourse(id);
 
         assertFalse(courseRepository.findById(id).isPresent());
+    }
+
+    @Test
+    void removeCourseThrowsWhenMissing() {
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(999999L));
     }
 
     private Course buildCourse(TypeCourse type, Support support, int level) {

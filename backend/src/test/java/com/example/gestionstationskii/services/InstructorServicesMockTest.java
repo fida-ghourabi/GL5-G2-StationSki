@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -20,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class InstructorServicesMockTest {
 
     @Mock
@@ -60,6 +63,13 @@ class InstructorServicesMockTest {
     }
 
     @Test
+    void retrieveAllInstructorsReturnsEmptyList() {
+        when(instructorRepository.findAll()).thenReturn(Collections.<Instructor>emptyList());
+
+        assertTrue(instructorServices.retrieveAllInstructors().isEmpty());
+    }
+
+    @Test
     void retrieveInstructorReturnsExistingInstructor() {
         Instructor instructor = buildInstructor("Ali", "A");
         instructor.setNumInstructor(1L);
@@ -95,6 +105,16 @@ class InstructorServicesMockTest {
     }
 
     @Test
+    void updateInstructorThrowsWhenMissing() {
+        Instructor update = buildInstructor("Omar", "Z");
+        update.setNumInstructor(99L);
+        when(instructorRepository.findById(99L)).thenReturn(Optional.<Instructor>empty());
+
+        assertThrows(BusinessException.class, () -> instructorServices.updateInstructor(update));
+        verify(instructorRepository, never()).save(any(Instructor.class));
+    }
+
+    @Test
     void assignCourseLinksCourseToInstructor() {
         Instructor instructor = buildInstructor("Ali", "A");
         instructor.setNumInstructor(1L);
@@ -124,6 +144,29 @@ class InstructorServicesMockTest {
         when(instructorRepository.findById(1L)).thenReturn(Optional.of(instructor));
         when(instructorRepository.findByCourses_NumCourse(2L))
                 .thenReturn(Collections.singletonList(buildInstructor("Other", "B")));
+
+        assertThrows(BusinessException.class, () -> instructorServices.assignCourse(1L, 2L));
+        verify(instructorRepository, never()).save(any(Instructor.class));
+    }
+
+    @Test
+    void assignCourseThrowsWhenCourseMissing() {
+        Instructor instructor = buildInstructor("Ali", "A");
+        instructor.setNumInstructor(1L);
+        instructor.setCourses(new HashSet<Course>());
+        when(courseRepository.lockById(2L)).thenReturn(Optional.<Course>empty());
+        when(instructorRepository.findById(1L)).thenReturn(Optional.of(instructor));
+
+        assertThrows(BusinessException.class, () -> instructorServices.assignCourse(1L, 2L));
+        verify(instructorRepository, never()).save(any(Instructor.class));
+    }
+
+    @Test
+    void assignCourseThrowsWhenInstructorMissing() {
+        Course course = new Course();
+        course.setNumCourse(2L);
+        when(courseRepository.lockById(2L)).thenReturn(Optional.of(course));
+        when(instructorRepository.findById(1L)).thenReturn(Optional.<Instructor>empty());
 
         assertThrows(BusinessException.class, () -> instructorServices.assignCourse(1L, 2L));
         verify(instructorRepository, never()).save(any(Instructor.class));
@@ -166,6 +209,14 @@ class InstructorServicesMockTest {
         when(instructorRepository.findById(1L)).thenReturn(Optional.of(instructor));
 
         assertThrows(BusinessException.class, () -> instructorServices.removeInstructor(1L));
+        verify(instructorRepository, never()).delete(any(Instructor.class));
+    }
+
+    @Test
+    void removeInstructorThrowsWhenMissing() {
+        when(instructorRepository.findById(99L)).thenReturn(Optional.<Instructor>empty());
+
+        assertThrows(BusinessException.class, () -> instructorServices.removeInstructor(99L));
         verify(instructorRepository, never()).delete(any(Instructor.class));
     }
 

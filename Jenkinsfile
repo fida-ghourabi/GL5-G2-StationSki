@@ -1,9 +1,8 @@
-
 /* ============================================================
    FONCTIONS UTILITAIRES
    ============================================================ */
 
-// Fournir les identifiants AWS temporaires
+// Fournit les identifiants AWS temporaires (AWS Academy)
 def withAws(Closure body) {
     withCredentials([
         string(credentialsId: 'aws-access-key',
@@ -19,12 +18,12 @@ def withAws(Closure body) {
     }
 }
 
-// Vérifier si un dossier a changé depuis le dernier commit
-// effectivement publié sur Docker Hub.
+// true si le dossier a change depuis le dernier commit
+// effectivement publie sur Docker Hub (ou si aucun etat memorise)
 def changedSince(String dir, String head) {
 
     def last = sh(
-        script: "cat \"$BUILD_STATE_DIR/${dir}.commit\" 2>/dev/null || true",
+        script: "cat \"\$BUILD_STATE_DIR/${dir}.commit\" 2>/dev/null || true",
         returnStdout: true
     ).trim()
 
@@ -62,7 +61,7 @@ pipeline {
         choice(
             name: 'ACTION',
             choices: ['apply', 'plan', 'destroy'],
-            description: 'Action Terraform et Kubernetes'
+            description: 'apply = build + EKS + deploiement | plan = jusqu au terraform plan | destroy = supprime EKS'
         )
     }
 
@@ -79,8 +78,9 @@ pipeline {
         // Outils
         SONAR_URL = 'http://sonarqube:9000'
         NEXUS_SNAPSHOTS = 'http://nexus:8081/repository/maven-snapshots/'
+        NEXUS_RELEASES = 'http://nexus:8081/repository/maven-releases/'
 
-        // Répertoires
+        // Repertoires
         BACKEND_DIR = 'backend'
         TERRAFORM_DIR = 'terraform'
 
@@ -100,7 +100,7 @@ pipeline {
         // GitOps
         GIT_REVISION = 'feature/sahar-saidani'
 
-        // Détection des changements
+        // Detection des changements
         BUILD_STATE_DIR = '/var/jenkins_home/build-state'
 
         // Tests
@@ -134,10 +134,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           1. GIT
+           01. SCM CHECKOUT
            ---------------------------------------------------- */
 
-        stage('1 - Recuperation du code Git') {
+        stage('01 - SCM Checkout (Git)') {
 
             steps {
                 checkout scm
@@ -146,10 +146,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           2. DETECTION DES CHANGEMENTS
+           02. CHANGE DETECTION
            ---------------------------------------------------- */
 
-        stage('2 - Detection des changements') {
+        stage('02 - Change Detection (git diff, incremental build)') {
 
             when {
                 expression {
@@ -199,10 +199,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           3. CLEAN MAVEN
+           03. MAVEN CLEAN
            ---------------------------------------------------- */
 
-        stage('3 - Nettoyage Maven') {
+        stage('03 - Maven Clean') {
 
             when {
                 expression {
@@ -222,10 +222,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           4. BUILD BACKEND
+           04. MAVEN COMPILE AND PACKAGE
            ---------------------------------------------------- */
 
-        stage('4 - Compilation et package JAR') {
+        stage('04 - Maven Compile and Package (JAR)') {
 
             when {
                 expression {
@@ -245,10 +245,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           5. TESTS UNITAIRES
+           05. TESTS
            ---------------------------------------------------- */
 
-        stage('5 - Tests JUnit et Mockito') {
+        stage('05 - Unit and Integration Tests (JUnit 5, Mockito, Testcontainers)') {
 
             when {
                 expression {
@@ -288,10 +288,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           6. SONARQUBE
+           06. STATIC CODE ANALYSIS
            ---------------------------------------------------- */
 
-        stage('6 - Analyse qualite SonarQube') {
+        stage('06 - Static Code Analysis (SonarQube, JaCoCo coverage)') {
 
             when {
                 expression {
@@ -325,10 +325,10 @@ pipeline {
 
 
         /* ----------------------------------------------------
-           7. NEXUS
+           07. NEXUS SNAPSHOT
            ---------------------------------------------------- */
 
-        stage('7 - Publication du JAR sur Nexus') {
+        stage('07 - Publish SNAPSHOT Artifact (Nexus Maven Snapshots)') {
 
             when {
                 expression {
@@ -375,10 +375,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           8. DOCKER BACKEND BUILD
+           08. DOCKER BUILD BACKEND
            ---------------------------------------------------- */
 
-        stage('8 - Build image Docker Backend') {
+        stage('08 - Docker Build (Backend image)') {
 
             when {
                 expression {
@@ -416,10 +416,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           9. PUSH BACKEND
+           09. DOCKER PUSH BACKEND
            ---------------------------------------------------- */
 
-        stage('9 - Push image Backend Docker Hub') {
+        stage('09 - Docker Push (Backend image, Docker Hub)') {
 
             when {
                 expression {
@@ -450,6 +450,7 @@ EOF
                         }
                     }
 
+                    // Memorise le commit seulement apres un push reussi
                     sh '''
                         echo "$HEAD_COMMIT" > "$BUILD_STATE_DIR/backend.commit"
                     '''
@@ -459,10 +460,75 @@ EOF
 
 
         /* ----------------------------------------------------
-           10. FRONTEND BUILD + PUSH
+           10. NEXUS RELEASE (backend uniquement)
+           Place apres le build Docker : le second jar genere
+           ici ne doit pas gener le COPY du Dockerfile.
            ---------------------------------------------------- */
 
-        stage('10 - Build et Push image Frontend') {
+        stage('10 - Publish RELEASE Artifact (Nexus Maven Releases)') {
+
+            when {
+                expression {
+                    env.ACTION != 'destroy' &&
+                    env.BACKEND_CHANGED == 'true'
+                }
+            }
+
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'nexus-creds',
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )
+                ]) {
+
+                    sh '''
+                        cat > "$WORKSPACE/settings-nexus.xml" <<EOF
+<settings>
+    <servers>
+        <server>
+            <id>nexus-releases</id>
+            <username>$NEXUS_USER</username>
+            <password>$NEXUS_PASS</password>
+        </server>
+    </servers>
+</settings>
+EOF
+                    '''
+
+                    dir("${BACKEND_DIR}") {
+
+                        sh '''
+                            mvn -B versions:set \
+                              -DnewVersion="$IMAGE_TAG" \
+                              -DgenerateBackupPoms=false
+
+                            mvn -B deploy -DskipTests \
+                              -s "$WORKSPACE/settings-nexus.xml" \
+                              -DaltDeploymentRepository=nexus-releases::default::$NEXUS_RELEASES
+                        '''
+                    }
+                }
+            }
+
+            post {
+
+                always {
+
+                    // Remet le pom.xml en version SNAPSHOT dans le workspace
+                    sh 'git checkout -- backend/pom.xml || true'
+                }
+            }
+        }
+
+
+        /* ----------------------------------------------------
+           11. DOCKER BUILD AND PUSH FRONTEND
+           ---------------------------------------------------- */
+
+        stage('11 - Docker Build and Push (Frontend image, Nginx)') {
 
             when {
                 expression {
@@ -513,10 +579,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           11. TERRAFORM VALIDATION
+           12. TERRAFORM INIT, FMT, VALIDATE
            ---------------------------------------------------- */
 
-        stage('11 - Terraform Validation') {
+        stage('12 - Terraform Init, Fmt and Validate (IaC lint)') {
 
             when {
                 expression {
@@ -552,10 +618,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           12. TERRAFORM PLAN
+           13. TERRAFORM PLAN
            ---------------------------------------------------- */
 
-        stage('12 - Terraform Plan') {
+        stage('13 - Terraform Plan (EKS infrastructure)') {
 
             when {
                 expression {
@@ -589,10 +655,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           13. VALIDATION MANUELLE
+           14. MANUAL APPROVAL GATE
            ---------------------------------------------------- */
 
-        stage('13 - Validation manuelle') {
+        stage('14 - Manual Approval Gate (cost control)') {
 
             when {
                 expression {
@@ -618,10 +684,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           14. TERRAFORM APPLY
+           15. TERRAFORM APPLY
            ---------------------------------------------------- */
 
-        stage('14 - Creation du cluster EKS') {
+        stage('15 - Terraform Apply (EKS cluster, node group, EBS CSI)') {
 
             when {
                 expression {
@@ -651,10 +717,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           15. MYSQL ON EKS
+           16. KUBERNETES DEPLOY (MYSQL)
            ---------------------------------------------------- */
 
-        stage('15 - Deploiement MySQL sur EKS') {
+        stage('16 - Kubernetes Deploy (MySQL, Secret, StorageClass, PVC)') {
 
             when {
                 expression {
@@ -779,10 +845,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           16. ARGOCD GITOPS
+           17. GITOPS DEPLOYMENT (ARGOCD)
            ---------------------------------------------------- */
 
-        stage('16 - ArgoCD Deploiement GitOps') {
+        stage('17 - GitOps Deployment (ArgoCD Application sync)') {
 
             when {
                 expression {
@@ -826,12 +892,12 @@ EOF
                               crd/applications.argoproj.io \
                               --timeout=120s
 
-                            # Configuration HTTP
+                            # Interface web en HTTP
                             kubectl -n argocd patch configmap argocd-cmd-params-cm \
                               --type merge \
                               -p '{"data":{"server.insecure":"true"}}'
 
-                            # NodePort
+                            # NodePort 30081
                             kubectl -n argocd patch svc argocd-server \
                               -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30081}]}}'
 
@@ -843,7 +909,7 @@ EOF
 
                             kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
 
-                            # Application GitOps
+                            # Application GitOps (chemin k8s/app du depot)
                             sed \
                               -e "s|IMAGE_PLACEHOLDER|$DEPLOY_IMAGE|g" \
                               -e "s|FRONTEND_PLACEHOLDER|$FRONTEND_DEPLOY_IMAGE|g" \
@@ -854,7 +920,7 @@ EOF
                               argocd.argoproj.io/refresh=hard \
                               --overwrite
 
-                            # Attendre la synchronisation
+                            # Attendre qu'ArgoCD ait deploye la bonne image
                             CUR=""
 
                             for i in $(seq 1 60); do
@@ -881,7 +947,20 @@ EOF
 
                             kubectl -n "$K8S_NAMESPACE" rollout status \
                               deployment/station-ski \
-                              --timeout=600s
+                              --timeout=600s || {
+
+                                echo "Diagnostic application"
+
+                                kubectl -n "$K8S_NAMESPACE" get pods -o wide
+
+                                kubectl -n "$K8S_NAMESPACE" describe pod -l app=station-ski | tail -40
+
+                                kubectl -n "$K8S_NAMESPACE" logs deploy/station-ski --tail=80 || true
+
+                                kubectl -n "$K8S_NAMESPACE" logs deploy/station-ski --previous --tail=80 || true
+
+                                exit 1
+                            }
 
                             kubectl -n argocd get applications
 
@@ -903,10 +982,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           17. MONITORING
+           18. OBSERVABILITY STACK
            ---------------------------------------------------- */
 
-        stage('17 - Monitoring Prometheus et Grafana') {
+        stage('18 - Observability Stack (Helm, kube-prometheus-stack)') {
 
             when {
                 expression {
@@ -938,13 +1017,13 @@ EOF
                                   --name "$CLUSTER_NAME" \
                                   --kubeconfig "$KUBECONFIG"
 
-                                # Ajouter le repository Helm
+                                # Repository Helm
                                 helm repo add prometheus-community \
                                   https://prometheus-community.github.io/helm-charts
 
                                 helm repo update
 
-                                # Installer Prometheus et Grafana
+                                # Prometheus et Grafana
                                 helm upgrade --install monitoring \
                                   prometheus-community/kube-prometheus-stack \
                                   --namespace monitoring \
@@ -972,10 +1051,10 @@ EOF
 
 
         /* ----------------------------------------------------
-           18. TERRAFORM DESTROY
+           19. TERRAFORM DESTROY
            ---------------------------------------------------- */
 
-        stage('18 - Destruction du cluster EKS') {
+        stage('19 - Terraform Destroy (EKS teardown)') {
 
             when {
                 expression {
@@ -989,33 +1068,31 @@ EOF
 
                     withAws {
 
+                        // Supprime d'abord les ressources Kubernetes
+                        // (volumes EBS crees par les PVC)
                         sh '''
                             export KUBECONFIG="$WORKSPACE/kubeconfig-eks"
 
-                            # Charger la configuration EKS
                             aws eks update-kubeconfig \
                               --region "$AWS_DEFAULT_REGION" \
                               --name "$CLUSTER_NAME" \
                               --kubeconfig "$KUBECONFIG" || true
 
-                            # Supprimer les applications GitOps
+                            # ArgoCD d'abord, sinon il recree l'application
                             kubectl -n argocd delete application station-ski \
                               --ignore-not-found \
                               --timeout=120s || true
 
-                            # Supprimer le monitoring
                             helm uninstall monitoring -n monitoring || true
 
                             kubectl delete namespace monitoring \
                               --ignore-not-found \
                               --timeout=300s || true
 
-                            # Supprimer ArgoCD
                             kubectl delete namespace argocd \
                               --ignore-not-found \
                               --timeout=300s || true
 
-                            # Supprimer MySQL et ses PVC
                             kubectl delete namespace "$K8S_NAMESPACE" \
                               --ignore-not-found \
                               --timeout=300s || true

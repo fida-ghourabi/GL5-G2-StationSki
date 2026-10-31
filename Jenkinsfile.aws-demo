@@ -1,0 +1,113 @@
+// Deploy an existing tested image. No compilation, testing or artifact publishing.
+// Shares persistent AWS state with stationski-ci: never run AWS jobs concurrently.
+pipeline {
+    agent any
+    parameters {
+        booleanParam(name: 'AWS_DEMO', defaultValue: false,
+            description: 'Explicitly enable BILLABLE EKS deployment. Initial/default runs do not create AWS resources.')
+        string(name: 'AWS_IMAGE_TAG', defaultValue: 'jenkins-12',
+            description: 'Existing published image tag, e.g. jenkins-11 or jenkins-12. No image is rebuilt.')
+        string(name: 'AWS_ADMIN_CIDR', defaultValue: '',
+            description: 'Current public IPv4 /32. Keep the same network/VPN throughout deployment.')
+    }
+    options {
+        disableConcurrentBuilds()
+        skipDefaultCheckout(true)
+        timeout(time: 100, unit: 'MINUTES')
+    }
+    environment {
+        AWS_EXPECTED_ACCOUNT = '085397751671'
+        AWS_DEMO_STATE_DIR = "${env.JENKINS_HOME}/stationski-aws-demo"
+    }
+    stages {
+        stage('CHECKOUT DEPLOYMENT CONFIG') {
+            steps {
+                checkout scm
+                echo 'AWS-only workflow: existing image, no CI stages. AWS is disabled unless AWS_DEMO is selected.'
+            }
+        }
+        stage('VERIFY EXISTING IMAGE') {
+            when { expression { params.AWS_DEMO } }
+            steps {
+                script {
+                    if (!(params.AWS_IMAGE_TAG ==~ /jenkins-[0-9]+/)) {
+                        error 'AWS_IMAGE_TAG must be an existing jenkins-N tag.'
+                    }
+                    env.AWS_SELECTED_IMAGE = "yassine1234/stationski-backend:${params.AWS_IMAGE_TAG}"
+                }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_TOKEN')]) {
+                    sh '''
+                        set +x
+                        export DOCKER_CONFIG="$(mktemp -d)"
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+                        printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+                        docker manifest inspect "$AWS_SELECTED_IMAGE" > /dev/null
+                    '''
+                }
+            }
+        }
+        stage('AWS PLAN AND APPROVAL') {
+            when { expression { params.AWS_DEMO } }
+            steps {
+                withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
+                    withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}"]) {
+                        sh 'bash devops/aws-demo.sh plan'
+                    }
+                }
+                timeout(time: 10, unit: 'MINUTES') {
+                    input message: 'Review plan and image. Approve billable EKS demo (~$0.15/hour baseline, not a spending cap)?',
+                        ok: 'Approve AWS-only deployment', submitter: 'yassine'
+                }
+            }
+        }
+        stage('TERRAFORM APPLY') {
+            when { expression { params.AWS_DEMO } }
+            steps {
+                script {
+                    writeFile file: "${env.AWS_DEMO_STATE_DIR}/cleanup-owner", text: env.BUILD_TAG
+                }
+                withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
+                    withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}"]) {
+                        sh 'bash devops/aws-demo.sh apply'
+                    }
+                }
+            }
+        }
+        stage('DEPLOY EXISTING IMAGE') {
+            when { expression { params.AWS_DEMO } }
+            steps {
+                withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
+                    withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}", "AWS_DEMO_IMAGE=${env.AWS_SELECTED_IMAGE}"]) {
+                        sh 'bash devops/aws-demo.sh deploy'
+                    }
+                }
+            }
+        }
+        stage('SCREENSHOTS - MAX 15 MINUTES') {
+            when { expression { params.AWS_DEMO } }
+            steps {
+                timeout(time: 15, unit: 'MINUTES') {
+                    input message: 'Save screenshots now. Cleanup starts after confirmation or timeout.',
+                        ok: 'Screenshots saved - DELETE AWS demo', submitter: 'yassine'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                if (params.AWS_DEMO &&
+                    fileExists("${env.AWS_DEMO_STATE_DIR}/cleanup-owner") &&
+                    readFile("${env.AWS_DEMO_STATE_DIR}/cleanup-owner").trim() == env.BUILD_TAG) {
+                    timeout(time: 60, unit: 'MINUTES') {
+                        withCredentials([file(credentialsId: 'aws-university-credentials', variable: 'AWS_SHARED_CREDENTIALS_FILE')]) {
+                            withEnv(["AWS_ADMIN_CIDR=${params.AWS_ADMIN_CIDR}"]) {
+                                sh 'bash devops/aws-demo.sh cleanup'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

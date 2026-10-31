@@ -154,7 +154,7 @@ Verified locally: Maven build/tests pass, MySQL is healthy, backend OpenAPI retu
 
 ## Optional AWS pipeline demo
 
-See [AWS pipeline instructions](devops/aws-pipeline.md). AWS stages are **disabled by default** and require a separate Secret-file credential, explicit plan/cost approval, and a screenshot window followed by automatic cleanup. Cleanup is best-effort: expired credentials/controller failures require manual recovery. No new AWS infrastructure was created while adding this automation. The earlier manual AWS demo was destroyed and verified.
+See [AWS pipeline instructions](devops/aws-pipeline.md). To redeploy an existing image without repeating CI, use [AWS-only job instructions](devops/aws-only.md) and `Jenkinsfile.aws-demo`. AWS stages are **disabled by default** and require a separate Secret-file credential, explicit plan/cost approval, and a screenshot window followed by automatic cleanup. Cleanup is best-effort: expired credentials/controller failures require manual recovery. No new AWS infrastructure was created while adding this automation. The earlier manual AWS demo was destroyed and verified.
 
 ## Application monitoring (Phase 15)
 

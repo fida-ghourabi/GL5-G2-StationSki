@@ -98,9 +98,16 @@ case "$MODE" in
       echo 'Cannot verify cluster deletion; check AWS credentials and retry.' >&2; exit 1
     fi
     for instance in $(<"$STATE_DIR/instances.txt"); do
-      status=$(aws ec2 describe-instances --instance-ids "$instance" \
-        --query 'Reservations[].Instances[].State.Name' --output text)
-      [[ "$status" == terminated ]] || { echo "Worker $instance not terminated" >&2; exit 1; }
+      if status=$(aws ec2 describe-instances --instance-ids "$instance" \
+        --query 'Reservations[].Instances[].State.Name' --output text 2> "$STATE_DIR/instance-error"); then
+        # AWS eventually purges old terminated IDs and may return an empty list.
+        case "$status" in
+          terminated|'') ;;
+          *) echo "Worker $instance not terminated" >&2; exit 1 ;;
+        esac
+      elif ! grep -q InvalidInstanceID.NotFound "$STATE_DIR/instance-error"; then
+        echo "Cannot verify worker $instance deletion" >&2; exit 1
+      fi
     done
     for volume in $(<"$STATE_DIR/volumes.txt"); do
       if aws ec2 describe-volumes --volume-ids "$volume" >/dev/null 2> "$STATE_DIR/volume-error"; then

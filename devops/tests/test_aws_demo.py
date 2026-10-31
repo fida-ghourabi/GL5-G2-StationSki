@@ -33,6 +33,9 @@ elif args[:2] == ['eks', 'describe-cluster']:
 elif args[:2] == ['eks', 'update-kubeconfig']:
     sys.exit(1)
 elif args[:2] == ['ec2', 'describe-instances']:
+    if '--instance-ids' in args:
+        print(os.environ.get('MOCK_INSTANCE_STATE', 'terminated'), end='')
+elif args[:2] == ['ec2', 'describe-volumes'] and '--filters' in args:
     pass
 else:
     sys.exit(90)
@@ -97,6 +100,20 @@ if 'plan' in args:
         self.assertIn("apply -input=false", self.calls())
         self.assertIn("Verified demo cleanup", result.stdout)
         self.assertFalse((self.state / "cleanup-owner").exists())
+
+    def test_cleanup_accepts_purged_historical_instance(self):
+        (self.state / "instances.txt").write_text("i-old\n")
+        self.env["MOCK_INSTANCE_STATE"] = ""
+        result = self.run_mode("cleanup")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Verified demo cleanup", result.stdout)
+
+    def test_cleanup_rejects_running_instance(self):
+        (self.state / "instances.txt").write_text("i-running\n")
+        self.env["MOCK_INSTANCE_STATE"] = "running"
+        result = self.run_mode("cleanup")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("Verified demo cleanup", result.stdout)
 
     def test_cleanup_does_not_claim_success_on_auth_failure(self):
         self.env["MOCK_CLUSTER_ERROR"] = "ExpiredTokenException"

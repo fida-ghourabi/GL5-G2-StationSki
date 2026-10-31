@@ -95,7 +95,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
         Checks.require(skier.getDateOfBirth() != null, "Date de naissance du skieur requise");
         ensureAgeMatchesCourse(skier, course, slot, slotId);
         ensureNoConflictingRegistration(skierId, course, slot);
-        long count = registrationRepository.findByPlanningSlot_Id(slotId).stream().filter(r -> !r.isCancelled()).count();
+        long count = registrationRepository.findByPlanningSlotId(slotId).stream().filter(r -> !r.isCancelled()).count();
         ensureSlotHasCapacity(slot, slotId, count);
         Registration r = new Registration();
         r.setSkier(skier); r.setCourse(course); r.setPlanningSlot(slot);
@@ -130,7 +130,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     }
 
     private void ensureNoConflictingRegistration(Long skierId, Course course, PlanningSlot slot) {
-        for (Registration r : registrationRepository.findBySkier_NumSkier(skierId)) {
+        for (Registration r : registrationRepository.findBySkierNumSkier(skierId)) {
             if (r.isCancelled()) continue;
             PlanningSlot other = r.getPlanningSlot();
             if (hasScheduleOverlap(other, slot))
@@ -195,7 +195,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     public List<Registration> bySkier(Long id) {
         log.debug("Finding registrations for skier {}", id);
         Checks.id(id); if (!skierRepository.existsById(id)) throw BusinessException.missing(SKIER_RESOURCE);
-        return registrationRepository.findBySkier_NumSkier(id);
+        return registrationRepository.findBySkierNumSkier(id);
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)

@@ -50,8 +50,8 @@ public class CourseServicesImpl implements ICourseServices {
             log.warn("Update refused: course id={} not found", course.getNumCourse());
             return BusinessException.missing("Cours");
         });
-        if ((registrationRepository.existsByCourse_NumCourse(current.getNumCourse())
-                || slotRepository.existsByCourse_NumCourse(current.getNumCourse()))
+        if ((registrationRepository.existsByCourseNumCourse(current.getNumCourse())
+                || slotRepository.existsByCourseNumCourse(current.getNumCourse()))
                 && (current.getTypeCourse() != course.getTypeCourse()
                 || current.getSupport() != course.getSupport()
                 || current.getLevel() != course.getLevel())) {
@@ -94,9 +94,9 @@ public class CourseServicesImpl implements ICourseServices {
     public void removeCourse(Long id) {
         log.debug("Removing course id={}", id);
         Course course = retrieveCourse(id);
-        if (registrationRepository.existsByCourse_NumCourse(id)
-                || slotRepository.existsByCourse_NumCourse(id)
-                || !instructorRepository.findByCourses_NumCourse(id).isEmpty()) {
+        if (registrationRepository.existsByCourseNumCourse(id)
+                || slotRepository.existsByCourseNumCourse(id)
+                || !instructorRepository.findByCoursesNumCourse(id).isEmpty()) {
             log.warn("Removal refused: course id={} is linked to an instructor, registrations or slots", id);
             throw BusinessException.conflict("Cours associé à un moniteur, des inscriptions ou des créneaux : suppression refusée");
         }
@@ -123,7 +123,7 @@ public class CourseServicesImpl implements ICourseServices {
     public List<Registration> registrations(Long id) {
         log.debug("Retrieving registrations of course id={}", id);
         retrieveCourse(id);
-        List<Registration> registrations = registrationRepository.findByCourse_NumCourse(id);
+        List<Registration> registrations = registrationRepository.findByCourseNumCourse(id);
         log.info("{} registration(s) found for course id={}", registrations.size(), id);
         return registrations;
     }
@@ -146,7 +146,7 @@ public class CourseServicesImpl implements ICourseServices {
     public List<Instructor> instructors(Long id) {
         log.debug("Retrieving instructors of course id={}", id);
         retrieveCourse(id);
-        List<Instructor> instructors = instructorRepository.findByCourses_NumCourse(id);
+        List<Instructor> instructors = instructorRepository.findByCoursesNumCourse(id);
         log.info("{} instructor(s) found for course id={}", instructors.size(), id);
         return instructors;
     }

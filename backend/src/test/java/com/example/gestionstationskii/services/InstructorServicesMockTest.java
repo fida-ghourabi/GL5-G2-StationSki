@@ -103,7 +103,7 @@ class InstructorServicesMockTest {
         course.setNumCourse(2L);
         when(courseRepository.lockById(2L)).thenReturn(Optional.of(course));
         when(instructorRepository.findById(1L)).thenReturn(Optional.of(instructor));
-        when(instructorRepository.findByCourses_NumCourse(2L))
+        when(instructorRepository.findByCoursesNumCourse(2L))
                 .thenReturn(Collections.<Instructor>emptyList());
         when(instructorRepository.save(any(Instructor.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -122,7 +122,7 @@ class InstructorServicesMockTest {
         course.setNumCourse(2L);
         when(courseRepository.lockById(2L)).thenReturn(Optional.of(course));
         when(instructorRepository.findById(1L)).thenReturn(Optional.of(instructor));
-        when(instructorRepository.findByCourses_NumCourse(2L))
+        when(instructorRepository.findByCoursesNumCourse(2L))
                 .thenReturn(Collections.singletonList(buildInstructor("Other", "B")));
 
         assertThrows(BusinessException.class, () -> instructorServices.assignCourse(1L, 2L));

@@ -141,7 +141,7 @@ class SubscriptionServicesMockitoTest {
         update.setEndDate(LocalDate.of(2099, 1, 1));
 
         when(subscriptionRepository.lockById(1L)).thenReturn(Optional.of(current));
-        when(paymentRepository.existsBySubscription_NumSub(1L)).thenReturn(false);
+        when(paymentRepository.existsBySubscriptionNumSub(1L)).thenReturn(false);
         when(subscriptionRepository.save(current)).thenReturn(current);
 
         Subscription result = service.updateSubscription(update);
@@ -170,7 +170,7 @@ class SubscriptionServicesMockitoTest {
 
         assertThrows(BusinessException.class, () -> service.updateSubscription(update));
 
-        verify(paymentRepository, never()).existsBySubscription_NumSub(any());
+        verify(paymentRepository, never()).existsBySubscriptionNumSub(any());
         verify(subscriptionRepository, never()).save(any());
     }
 
@@ -179,7 +179,7 @@ class SubscriptionServicesMockitoTest {
         Subscription current = subscription(1L, TypeSubscription.MONTHLY);
         Subscription update = subscription(1L, TypeSubscription.MONTHLY);
         when(subscriptionRepository.lockById(1L)).thenReturn(Optional.of(current));
-        when(paymentRepository.existsBySubscription_NumSub(1L)).thenReturn(true);
+        when(paymentRepository.existsBySubscriptionNumSub(1L)).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.updateSubscription(update));
 
@@ -242,30 +242,31 @@ class SubscriptionServicesMockitoTest {
 
     @Test
     void retrieveSubscriptionsByDatesRejectsMissingStartDate() {
+        LocalDate endDate = LocalDate.now();
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(null, LocalDate.now())
+                () -> service.retrieveSubscriptionsByDates(null, endDate)
         );
         verifyNoInteractions(subscriptionRepository);
     }
 
     @Test
     void retrieveSubscriptionsByDatesRejectsMissingEndDate() {
+        LocalDate startDate = LocalDate.now();
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(LocalDate.now(), null)
+                () -> service.retrieveSubscriptionsByDates(startDate, null)
         );
         verifyNoInteractions(subscriptionRepository);
     }
 
     @Test
     void retrieveSubscriptionsByDatesRejectsReversedPeriod() {
+        LocalDate startDate = LocalDate.of(2026, 2, 1);
+        LocalDate endDate = LocalDate.of(2026, 1, 1);
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(
-                        LocalDate.of(2026, 2, 1),
-                        LocalDate.of(2026, 1, 1)
-                )
+                () -> service.retrieveSubscriptionsByDates(startDate, endDate)
         );
         verifyNoInteractions(subscriptionRepository);
     }
@@ -293,7 +294,7 @@ class SubscriptionServicesMockitoTest {
     void removeSubscriptionDeletesUnusedSubscription() {
         Subscription subscription = subscription(1L, TypeSubscription.MONTHLY);
         when(subscriptionRepository.lockById(1L)).thenReturn(Optional.of(subscription));
-        when(paymentRepository.existsBySubscription_NumSub(1L)).thenReturn(false);
+        when(paymentRepository.existsBySubscriptionNumSub(1L)).thenReturn(false);
         when(skierRepository.findBySubscription(subscription)).thenReturn(null);
 
         service.removeSubscription(1L);
@@ -314,14 +315,14 @@ class SubscriptionServicesMockitoTest {
 
         assertThrows(BusinessException.class, () -> service.removeSubscription(99L));
 
-        verify(paymentRepository, never()).existsBySubscription_NumSub(any());
+        verify(paymentRepository, never()).existsBySubscriptionNumSub(any());
     }
 
     @Test
     void removeSubscriptionRejectsSubscriptionWithPayment() {
         Subscription subscription = subscription(1L, TypeSubscription.MONTHLY);
         when(subscriptionRepository.lockById(1L)).thenReturn(Optional.of(subscription));
-        when(paymentRepository.existsBySubscription_NumSub(1L)).thenReturn(true);
+        when(paymentRepository.existsBySubscriptionNumSub(1L)).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> service.removeSubscription(1L));
 
@@ -333,7 +334,7 @@ class SubscriptionServicesMockitoTest {
     void removeSubscriptionRejectsSubscriptionAssignedToSkier() {
         Subscription subscription = subscription(1L, TypeSubscription.MONTHLY);
         when(subscriptionRepository.lockById(1L)).thenReturn(Optional.of(subscription));
-        when(paymentRepository.existsBySubscription_NumSub(1L)).thenReturn(false);
+        when(paymentRepository.existsBySubscriptionNumSub(1L)).thenReturn(false);
         when(skierRepository.findBySubscription(subscription)).thenReturn(new Skier());
 
         assertThrows(BusinessException.class, () -> service.removeSubscription(1L));
@@ -374,8 +375,9 @@ class SubscriptionServicesMockitoTest {
         Subscription subscription = subscription(1L, TypeSubscription.MONTHLY);
         subscription.setStartDate(null);
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(subscription));
+        LocalDate referenceDate = LocalDate.now();
 
-        assertThrows(BusinessException.class, () -> service.status(1L, LocalDate.now()));
+        assertThrows(BusinessException.class, () -> service.status(1L, referenceDate));
     }
 
     @Test
@@ -383,8 +385,9 @@ class SubscriptionServicesMockitoTest {
         Subscription subscription = subscription(1L, TypeSubscription.MONTHLY);
         subscription.setEndDate(null);
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(subscription));
+        LocalDate referenceDate = LocalDate.now();
 
-        assertThrows(BusinessException.class, () -> service.status(1L, LocalDate.now()));
+        assertThrows(BusinessException.class, () -> service.status(1L, referenceDate));
     }
 
     private static Subscription subscription(Long id, TypeSubscription type) {

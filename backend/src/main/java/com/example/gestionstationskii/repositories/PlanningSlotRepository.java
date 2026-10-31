@@ -8,6 +8,6 @@ public interface PlanningSlotRepository extends JpaRepository<PlanningSlot, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from PlanningSlot s where s.id = :id")
     Optional<PlanningSlot> lockById(@Param("id") Long id);
-    boolean existsByCourse_NumCourse(Long id);
-    boolean existsByInstructor_NumInstructor(Long id);
+    boolean existsByCourseNumCourse(Long id);
+    boolean existsByInstructorNumInstructor(Long id);
 }

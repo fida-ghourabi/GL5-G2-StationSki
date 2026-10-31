@@ -68,9 +68,9 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public Skier addSkierAndAssignToCourse(Skier skier, Long numCourse) {
         Checks.id(numCourse);
-        courseRepository.findById(numCourse).orElseThrow(() -> BusinessException.missing("Cours"));
+        Course course = courseRepository.findById(numCourse).orElseThrow(() -> BusinessException.missing("Cours"));
         Skier savedSkier = addSkier(skier);
-        PlanningSlot slot = registrationServices.nextAvailableSlot(numCourse);
+        PlanningSlot slot = registrationServices.nextAvailableSlot(course.getNumCourse());
         registrationServices.registerSlot(savedSkier.getNumSkier(), slot.getId());
         return savedSkier;
     }
@@ -78,8 +78,8 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public void removeSkier(Long numSkier) {
         Skier skier = retrieveSkier(numSkier);
-        if (registrationRepository.existsBySkier_NumSkier(numSkier)
-                || paymentRepository.existsBySkier_NumSkier(numSkier))
+        if (registrationRepository.existsBySkierNumSkier(numSkier)
+                || paymentRepository.existsBySkierNumSkier(numSkier))
             throw BusinessException.conflict("Skieur ayant un historique d'inscription ou de paiement : suppression refusée");
         skierRepository.delete(skier);
     }
@@ -106,7 +106,7 @@ public class SkierServicesImpl implements ISkierServices {
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<Skier> retrieveSkiersBySubscriptionType(TypeSubscription typeSubscription) {
         Checks.require(typeSubscription != null, "Type d'abonnement requis");
-        return skierRepository.findBySubscription_TypeSub(typeSubscription);
+        return skierRepository.findBySubscriptionTypeSub(typeSubscription);
     }
 
     private void validate(Skier skier) {

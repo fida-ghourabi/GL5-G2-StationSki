@@ -40,7 +40,7 @@ public class PlanningServicesImpl implements IPlanningServices {
     public List<InstructorAvailability> availability(Long id) {
         Checks.id(id);
         if (!instructors.existsById(id)) throw BusinessException.missing(INSTRUCTOR_RESOURCE);
-        return availabilities.findByInstructor_NumInstructor(id);
+        return availabilities.findByInstructorNumInstructor(id);
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
@@ -56,7 +56,7 @@ public class PlanningServicesImpl implements IPlanningServices {
         if (current.getStatus() == SlotStatus.CANCELLED) throw BusinessException.conflict("Créneau annulé non modifiable");
         if (!current.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non modifiable");
         // Do not silently move a skier's confirmed appointment.
-        if (!registrations.findByPlanningSlot_Id(id).isEmpty()) throw BusinessException.conflict("Créneau avec historique d'inscriptions non modifiable");
+        if (!registrations.findByPlanningSlotId(id).isEmpty()) throw BusinessException.conflict("Créneau avec historique d'inscriptions non modifiable");
         return save(current, input);
     }
     private PlanningSlot save(PlanningSlot slot, Requests.Slot input) {
@@ -87,7 +87,7 @@ public class PlanningServicesImpl implements IPlanningServices {
         PlanningSlot slot = slots.lockById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
         if (!slot.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non annulable");
         slot.setStatus(SlotStatus.CANCELLED);
-        registrations.findByPlanningSlot_Id(id).forEach(r -> r.setCancelled(true));
+        registrations.findByPlanningSlotId(id).forEach(r -> r.setCancelled(true));
     }
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)

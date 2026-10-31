@@ -57,7 +57,7 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
         log.debug("Mise à jour de l'abonnement demandée : id={}", subscription.getNumSub());
         Checks.id(subscription.getNumSub());
         Subscription current = subscriptionRepository.lockById(subscription.getNumSub()).orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
-        if (paymentRepository.existsBySubscription_NumSub(current.getNumSub())) {
+        if (paymentRepository.existsBySubscriptionNumSub(current.getNumSub())) {
             log.warn("Mise à jour refusée : abonnement lié à un paiement, id={}", current.getNumSub());
             throw BusinessException.conflict("Abonnement lié à un paiement : historique immuable");
         }
@@ -121,7 +121,7 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
         log.debug("Suppression de l'abonnement demandée : id={}", id);
         Checks.id(id);
         Subscription sub = subscriptionRepository.lockById(id).orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
-        if (paymentRepository.existsBySubscription_NumSub(id) || skierRepository.findBySubscription(sub) != null) {
+        if (paymentRepository.existsBySubscriptionNumSub(id) || skierRepository.findBySubscription(sub) != null) {
             log.warn("Suppression refusée : abonnement affecté ou lié à un paiement, id={}", id);
             throw BusinessException.conflict("Abonnement affecté ou lié à un paiement : suppression refusée");
         }

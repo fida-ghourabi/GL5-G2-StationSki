@@ -48,7 +48,7 @@ class PaymentServicesWithoutMockitoTest {
         TestData data = createTestData();
         Requests.PaymentInput input = paymentInput(data.skier.getNumSkier(), data.subscription.getNumSub());
 
-        Payment saved = paymentService.record(input);
+        Payment saved = paymentService.recordPayment(input);
 
         assertNotNull(saved.getId());
         assertEquals(PaymentStatus.PENDING, saved.getStatus());
@@ -59,7 +59,7 @@ class PaymentServicesWithoutMockitoTest {
     @Test
     void changesStatusAndCreatesRefund() {
         TestData data = createTestData();
-        Payment payment = paymentService.record(paymentInput(
+        Payment payment = paymentService.recordPayment(paymentInput(
                 data.skier.getNumSkier(),
                 data.subscription.getNumSub()
         ));
@@ -81,7 +81,7 @@ class PaymentServicesWithoutMockitoTest {
     @Test
     void buildsReceiptFromPersistedPayment() {
         TestData data = createTestData();
-        Payment payment = paymentService.record(paymentInput(
+        Payment payment = paymentService.recordPayment(paymentInput(
                 data.skier.getNumSkier(),
                 data.subscription.getNumSub()
         ));

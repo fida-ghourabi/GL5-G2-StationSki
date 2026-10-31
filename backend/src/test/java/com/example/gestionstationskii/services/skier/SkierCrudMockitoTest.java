@@ -121,14 +121,14 @@ class SkierCrudMockitoTest {
         Skier stored = skier();
         stored.setNumSkier(1L);
         when(skierRepository.findById(1L)).thenReturn(Optional.of(stored));
-        when(registrationRepository.existsBySkier_NumSkier(1L)).thenReturn(false);
-        when(paymentRepository.existsBySkier_NumSkier(1L)).thenReturn(false);
+        when(registrationRepository.existsBySkierNumSkier(1L)).thenReturn(false);
+        when(paymentRepository.existsBySkierNumSkier(1L)).thenReturn(false);
 
         service.removeSkier(1L);
 
         verify(skierRepository).findById(1L);
-        verify(registrationRepository).existsBySkier_NumSkier(1L);
-        verify(paymentRepository).existsBySkier_NumSkier(1L);
+        verify(registrationRepository).existsBySkierNumSkier(1L);
+        verify(paymentRepository).existsBySkierNumSkier(1L);
         verify(skierRepository).delete(stored);
         verifyNoMoreInteractions(skierRepository, registrationRepository, paymentRepository);
         verifyUnrelatedDependenciesUnused();

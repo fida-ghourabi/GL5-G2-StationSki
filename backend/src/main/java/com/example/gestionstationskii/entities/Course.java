@@ -35,6 +35,7 @@ public class Course implements Serializable {
 	 * Legacy display value; precise scheduling is stored in PlanningSlot.
 	 * @deprecated Retained for compatibility with existing data and clients; remove after migration.
 	 */
+	@SuppressWarnings("java:S1133") // Kept until API clients and stored data no longer depend on this legacy field.
 	@Deprecated
 	private int timeSlot;
 

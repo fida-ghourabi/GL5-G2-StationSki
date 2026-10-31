@@ -105,7 +105,6 @@ pipeline {
         AWS_ACCESS_KEY_ID_CREDENTIALS     = 'aws-access-key-id'
         AWS_SECRET_ACCESS_KEY_CREDENTIALS = 'aws-secret-access-key'
         AWS_SESSION_TOKEN_CREDENTIALS     = 'aws-session-token'
-        IMAGE_TAG = 'pending'
         BACKEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-backend"
         FRONTEND_IMAGE = "${params.DOCKERHUB_NAMESPACE}/stationski-frontend"
     }

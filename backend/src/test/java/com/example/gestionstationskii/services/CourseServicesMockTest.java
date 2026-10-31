@@ -96,7 +96,7 @@ class CourseServicesMockTest {
         Course course = buildCourse();
         course.setNumCourse(1L);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
-        when(instructorRepository.findByCourses_NumCourse(1L))
+        when(instructorRepository.findByCoursesNumCourse(1L))
                 .thenReturn(Collections.<Instructor>emptyList());
 
         courseServices.removeCourse(1L);
@@ -109,7 +109,7 @@ class CourseServicesMockTest {
         Course course = buildCourse();
         course.setNumCourse(1L);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
-        when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+        when(registrationRepository.existsByCourseNumCourse(1L)).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> courseServices.removeCourse(1L));
         verify(courseRepository, never()).delete(any(Course.class));

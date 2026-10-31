@@ -75,7 +75,7 @@ void addAvailabilityRejectsInvalidTimeRange() {
 
         assertThrows(BusinessException.class, () -> service.availability(99L));
 
-        verify(availabilities, never()).findByInstructor_NumInstructor(anyLong());
+        verify(availabilities, never()).findByInstructorNumInstructor(anyLong());
     }
 
     @Test
@@ -123,7 +123,7 @@ void addAvailabilityRejectsInvalidTimeRange() {
 
         assertThrows(BusinessException.class, () -> service.create(input));
 
-        verify(availabilities, never()).findByInstructor_NumInstructor(anyLong());
+        verify(availabilities, never()).findByInstructorNumInstructor(anyLong());
         verify(slots, never()).save(any(PlanningSlot.class));
     }
 
@@ -132,7 +132,7 @@ void addAvailabilityRejectsInvalidTimeRange() {
         PlanningSlot current = slot(8L, LocalDateTime.now().plusDays(2));
         Requests.Slot update = slotInput(1L, 2L, 6);
         when(slots.lockById(8L)).thenReturn(Optional.of(current));
-        when(registrations.findByPlanningSlot_Id(8L)).thenReturn(Collections.singletonList(new Registration()));
+        when(registrations.findByPlanningSlotId(8L)).thenReturn(Collections.singletonList(new Registration()));
 
         assertThrows(BusinessException.class, () -> service.update(8L, update));
 
@@ -159,7 +159,7 @@ void addAvailabilityRejectsInvalidTimeRange() {
         PlanningSlot slot = slot(8L, LocalDateTime.now().plusDays(2));
         Registration registration = new Registration();
         when(slots.lockById(8L)).thenReturn(Optional.of(slot));
-        when(registrations.findByPlanningSlot_Id(8L)).thenReturn(Collections.singletonList(registration));
+        when(registrations.findByPlanningSlotId(8L)).thenReturn(Collections.singletonList(registration));
 
         service.cancel(8L);
 
@@ -193,7 +193,7 @@ void addAvailabilityRejectsInvalidTimeRange() {
     when(courses.lockById(1L)).thenReturn(Optional.of(course));
     when(instructors.lockById(2L)).thenReturn(Optional.of(instructor));
     when(instructors.existsById(2L)).thenReturn(true);
-    when(availabilities.findByInstructor_NumInstructor(2L))
+    when(availabilities.findByInstructorNumInstructor(2L))
             .thenReturn(Collections.singletonList(availability(instructor, input.getStartTime().toLocalDate())));
 }
 

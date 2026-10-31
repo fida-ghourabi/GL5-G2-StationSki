@@ -22,7 +22,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     private final ISubscriptionRepository subscriptions;
 
     @Override
-    public Payment record(Requests.PaymentInput input) {
+    public Payment recordPayment(Requests.PaymentInput input) {
         log.debug("Enregistrement d'un paiement demandé : skieur={}, abonnement={}",
                 input.getSkierId(), input.getSubscriptionId());
         Checks.id(input.getSkierId()); Checks.id(input.getSubscriptionId()); Checks.money(input.getAmount());
@@ -90,8 +90,8 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Transactional(readOnly = true)
     public List<Payment> bySkier(Long id) {
         Checks.id(id);
-        skiers.findById(id).orElseThrow(() -> BusinessException.missing("Skieur"));
-        List<Payment> result = payments.findBySkier_NumSkier(id);
+        Skier skier = skiers.findById(id).orElseThrow(() -> BusinessException.missing("Skieur"));
+        List<Payment> result = payments.findBySkierNumSkier(skier.getNumSkier());
         log.debug("Paiements récupérés par skieur : skieur={}, nombre={}", id, result.size());
         return result;
     }
@@ -99,8 +99,8 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Transactional(readOnly = true)
     public List<Payment> bySubscription(Long id) {
         Checks.id(id);
-        subscriptions.findById(id).orElseThrow(() -> BusinessException.missing("Abonnement"));
-        List<Payment> result = payments.findBySubscription_NumSub(id);
+        Subscription subscription = subscriptions.findById(id).orElseThrow(() -> BusinessException.missing("Abonnement"));
+        List<Payment> result = payments.findBySubscriptionNumSub(subscription.getNumSub());
         log.debug("Paiements récupérés par abonnement : abonnement={}, nombre={}", id, result.size());
         return result;
     }
@@ -108,7 +108,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Transactional(readOnly = true)
     public List<Refund> refunds(Long id) {
         get(id);
-        List<Refund> result = refunds.findByPayment_Id(id);
+        List<Refund> result = refunds.findByPaymentId(id);
         log.debug("Remboursements récupérés : paiement={}, nombre={}", id, result.size());
         return result;
     }
@@ -119,7 +119,7 @@ public class PaymentServicesImpl implements IPaymentServices {
         PaymentReceipt receipt = new PaymentReceipt(p.getReceiptNumber(), p.getId(), p.getSkier().getNumSkier(),
                 p.getSkier().getFirstName() + " " + p.getSkier().getLastName(), p.getSubscription().getNumSub(),
                 p.getPaymentDate(), p.getPaidAt(), p.getMethod(), p.getStatus(), p.getAmount(), p.getRefundedAmount(),
-                p.getPaidAt() == null ? BigDecimal.ZERO : p.getAmount().subtract(p.getRefundedAmount()), refunds.findByPayment_Id(id));
+                p.getPaidAt() == null ? BigDecimal.ZERO : p.getAmount().subtract(p.getRefundedAmount()), refunds.findByPaymentId(id));
         log.debug("Reçu de paiement préparé : paiement={}, référence={}", id, p.getReceiptNumber());
         return receipt;
     }

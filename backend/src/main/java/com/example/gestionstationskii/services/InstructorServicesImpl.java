@@ -96,7 +96,7 @@ public class InstructorServicesImpl implements IInstructorServices {
             return BusinessException.missing("Cours");
         });
         Instructor instructor = retrieveInstructor(id);
-        if (!instructorRepository.findByCourses_NumCourse(courseId).isEmpty()) {
+        if (!instructorRepository.findByCoursesNumCourse(courseId).isEmpty()) {
             log.warn("Assignment refused: course id={} already has an instructor", courseId);
             throw BusinessException.conflict("Cours déjà associé à un moniteur");
         }
@@ -136,8 +136,8 @@ public class InstructorServicesImpl implements IInstructorServices {
         log.debug("Removing instructor id={}", id);
         Instructor instructor = retrieveInstructor(id);
         if (!instructor.getCourses().isEmpty()
-                || slotRepository.existsByInstructor_NumInstructor(id)
-                || availabilityRepository.existsByInstructor_NumInstructor(id)) {
+                || slotRepository.existsByInstructorNumInstructor(id)
+                || availabilityRepository.existsByInstructorNumInstructor(id)) {
             log.warn("Removal refused: instructor id={} is linked to courses, slots or availabilities", id);
             throw BusinessException.conflict("Moniteur associé à des cours, créneaux ou disponibilités : suppression refusée");
         }

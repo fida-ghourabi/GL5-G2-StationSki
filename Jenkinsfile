@@ -1158,6 +1158,19 @@ pipeline {
                 allowEmptyArchive: true,
                 fingerprint: true
             )
+
+            emailext(
+                subject: "Jenkins - ${currentBuild.currentResult} - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    <h2>Résultat du pipeline Jenkins</h2>
+                    <p><b>Projet :</b> ${env.JOB_NAME}</p>
+                    <p><b>Build :</b> #${env.BUILD_NUMBER}</p>
+                    <p><b>Résultat :</b> ${currentBuild.currentResult}</p>
+                    <p><a href="${env.BUILD_URL}">Voir le build Jenkins</a></p>
+                """,
+                to: 'fidagh803@gmail.com',
+                mimeType: 'text/html'
+            )
         }
 
         /*

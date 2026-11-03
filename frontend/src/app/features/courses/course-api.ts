@@ -9,3 +9,5 @@ export class CourseApi {
   registrations(id: number) { return this.api.get<Registration[]>(`/course/${id}/registrations`); }
   participants(id: number) { return this.api.get<number>(`/course/${id}/participants/count`); }
 }
+
+

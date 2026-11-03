@@ -9,6 +9,7 @@ import com.example.gestionstationskii.entities.Support;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -60,6 +61,17 @@ class RegistrationRestControllerMockTest {
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("Capacité atteinte"))
                 .andExpect(jsonPath("$.path").value("/registration/skier/3/slot/5"));
+    }
+
+    @Test
+    void concurrentOrIntegrityConflictIsReturnedAsConflictJson() throws Exception {
+        when(service.registerSlot(3L, 5L)).thenThrow(new DataIntegrityViolationException("duplicate registration"));
+
+        mvc.perform(post("/registration/skier/3/slot/5"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").value(
+                        "Conflit de données ou opération concurrente ; vérifier les associations et réessayer"));
     }
 
     @Test
@@ -118,7 +130,8 @@ class RegistrationRestControllerMockTest {
                 .thenReturn(created);
 
         mvc.perform(put("/registration/addAndAssignToSkier/3")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"numRegistration\":99,\"numWeek\":7}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"numRegistration\":99,\"numWeek\":7,\"planningSlot\":{\"id\":30}}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.numRegistration").value(21));
         mvc.perform(put("/registration/assignToCourse/21/12"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.numRegistration").value(21));
@@ -126,7 +139,8 @@ class RegistrationRestControllerMockTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.numRegistration").value(21));
 
-        verify(service).addRegistrationAndAssignToSkier(argThat(input -> Long.valueOf(99L).equals(input.getNumRegistration())), eq(3L));
+        verify(service).addRegistrationAndAssignToSkier(argThat(input -> Long.valueOf(99L).equals(input.getNumRegistration())
+                && input.getPlanningSlot() != null && Long.valueOf(30L).equals(input.getPlanningSlot().getId())), eq(3L));
         verify(service).assignRegistrationToCourse(21L, 12L);
         verify(service).addRegistrationAndAssignToSkierAndCourse(any(Registration.class), eq(3L), eq(12L));
     }

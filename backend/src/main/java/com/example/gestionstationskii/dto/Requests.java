@@ -62,7 +62,6 @@ public final class Requests {
         private TypeCourse typeCourse;
         private Support support;
         private Float price;
-        private int timeSlot;
 
         public Course toEntity() {
             Course course = new Course();
@@ -71,7 +70,6 @@ public final class Requests {
             course.setTypeCourse(typeCourse);
             course.setSupport(support);
             course.setPrice(price);
-            course.setTimeSlot(timeSlot);
             return course;
         }
     }

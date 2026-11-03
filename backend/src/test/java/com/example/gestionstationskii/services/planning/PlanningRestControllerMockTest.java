@@ -48,6 +48,17 @@ class PlanningRestControllerMockTest {
     }
 
     @Test
+    void instructorAvailabilityGetRouteDelegatesId() throws Exception {
+        when(service.availability(4L)).thenReturn(Collections.<InstructorAvailability>emptyList());
+
+        mvc.perform(get("/planning/instructors/4/availability"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        verify(service).availability(4L);
+    }
+
+    @Test
     void slotSearchRoutesPassDateAndFiltersToService() throws Exception {
         when(service.search(any(LocalDateTime.class), any(LocalDateTime.class), any(), any(), anyBoolean()))
                 .thenReturn(Collections.<PlanningSlot>emptyList());

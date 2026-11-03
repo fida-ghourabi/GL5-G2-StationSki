@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,6 +39,10 @@ public class PlanningServicesImpl implements IPlanningServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public List<InstructorAvailability> availability(Long id) {
+        return findAvailability(id);
+    }
+
+    private List<InstructorAvailability> findAvailability(Long id) {
         Checks.id(id);
         if (!instructors.existsById(id)) throw BusinessException.missing(INSTRUCTOR_RESOURCE);
         return availabilities.findByInstructor_NumInstructor(id);
@@ -54,7 +59,7 @@ public class PlanningServicesImpl implements IPlanningServices {
         Checks.id(id);
         PlanningSlot current = slots.lockById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
         if (current.getStatus() == SlotStatus.CANCELLED) throw BusinessException.conflict("Créneau annulé non modifiable");
-        if (!current.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non modifiable");
+        if (!current.getStartTime().isAfter(LocalDateTime.now(ZoneId.systemDefault()))) throw BusinessException.conflict("Créneau commencé non modifiable");
         // Do not silently move a skier's confirmed appointment.
         if (!registrations.findByPlanningSlot_Id(id).isEmpty()) throw BusinessException.conflict("Créneau avec historique d'inscriptions non modifiable");
         return save(current, input);
@@ -62,14 +67,14 @@ public class PlanningServicesImpl implements IPlanningServices {
     private PlanningSlot save(PlanningSlot slot, Requests.Slot input) {
         Checks.id(input.getCourseId()); Checks.id(input.getInstructorId());
         Checks.require(input.getStartTime() != null && input.getEndTime() != null && input.getStartTime().isBefore(input.getEndTime())
-                && input.getStartTime().isAfter(LocalDateTime.now()) && input.getStartTime().toLocalDate().equals(input.getEndTime().toLocalDate()), "Créneau futur, de durée positive et sur une même journée requis");
+                && input.getStartTime().isAfter(LocalDateTime.now(ZoneId.systemDefault())) && input.getStartTime().toLocalDate().equals(input.getEndTime().toLocalDate()), "Créneau futur, de durée positive et sur une même journée requis");
         Course course = courses.lockById(input.getCourseId()).orElseThrow(() -> BusinessException.missing("Cours"));
         Instructor instructor = instructors.lockById(input.getInstructorId()).orElseThrow(() -> BusinessException.missing(INSTRUCTOR_RESOURCE));
         if (!instructor.getCourses().contains(course)) throw BusinessException.conflict("Ce moniteur n'est pas associé au cours");
         int ceiling = course.getTypeCourse() == TypeCourse.INDIVIDUAL ? 1 : 6;
         Checks.require(input.getMaxCapacity() != null && input.getMaxCapacity() > 0 && input.getMaxCapacity() <= ceiling,
                 "Capacité requise : 1 en individuel, au plus 6 en collectif");
-        boolean covered = availability(instructor.getNumInstructor()).stream().anyMatch(a -> a.getDayOfWeek() == input.getStartTime().getDayOfWeek()
+        boolean covered = findAvailability(instructor.getNumInstructor()).stream().anyMatch(a -> a.getDayOfWeek() == input.getStartTime().getDayOfWeek()
                 && !input.getStartTime().toLocalDate().isBefore(a.getValidFrom()) && !input.getEndTime().toLocalDate().isAfter(a.getValidUntil())
                 && !input.getStartTime().toLocalTime().isBefore(a.getStartTime()) && !input.getEndTime().toLocalTime().isAfter(a.getEndTime()));
         if (!covered) throw BusinessException.conflict("Créneau hors des disponibilités du moniteur");
@@ -85,7 +90,7 @@ public class PlanningServicesImpl implements IPlanningServices {
     public void cancel(Long id) {
         Checks.id(id);
         PlanningSlot slot = slots.lockById(id).orElseThrow(() -> BusinessException.missing(SLOT_RESOURCE));
-        if (!slot.getStartTime().isAfter(LocalDateTime.now())) throw BusinessException.conflict("Créneau commencé non annulable");
+        if (!slot.getStartTime().isAfter(LocalDateTime.now(ZoneId.systemDefault()))) throw BusinessException.conflict("Créneau commencé non annulable");
         slot.setStatus(SlotStatus.CANCELLED);
         registrations.findByPlanningSlot_Id(id).forEach(r -> r.setCancelled(true));
     }
@@ -104,7 +109,7 @@ public class PlanningServicesImpl implements IPlanningServices {
         return slots.findAll().stream().filter(s -> TimeRanges.overlaps(s.getStartTime(), s.getEndTime(), from, to)
                 && (courseId == null || s.getCourse().getNumCourse().equals(courseId))
                 && (instructorId == null || s.getInstructor().getNumInstructor().equals(instructorId))
-                && (!available || (s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(LocalDateTime.now()))))
+                && (!available || (s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(LocalDateTime.now(ZoneId.systemDefault())))))
                 .sorted(java.util.Comparator.comparing(PlanningSlot::getStartTime)).collect(Collectors.toList());
     }
 }

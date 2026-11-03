@@ -101,4 +101,70 @@ class PisteCrudMockitoTest {
         verify(repository).delete(stored);
         verifyNoMoreInteractions(repository);
     }
+
+    @Test
+    void rejectsNullOrInvalidPistesAndPreassignedIds() {
+        assertThrows(BusinessException.class, () -> service.addPiste(null));
+
+        Piste identified = piste();
+        identified.setNumPiste(3L);
+        assertThrows(BusinessException.class, () -> service.addPiste(identified));
+
+        Piste noColor = piste();
+        noColor.setColor(null);
+        assertThrows(BusinessException.class, () -> service.addPiste(noColor));
+
+        Piste noLength = piste();
+        noLength.setLength(0);
+        assertThrows(BusinessException.class, () -> service.addPiste(noLength));
+
+        Piste invalidSlope = piste();
+        invalidSlope.setSlope(91);
+        assertThrows(BusinessException.class, () -> service.addPiste(invalidSlope));
+
+        Piste negativeSlope = piste();
+        negativeSlope.setSlope(-1);
+        assertThrows(BusinessException.class, () -> service.addPiste(negativeSlope));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void updatesRejectNullAndMissingPistes() {
+        assertThrows(BusinessException.class, () -> service.updatePiste(null));
+
+        Piste update = piste();
+        update.setNumPiste(5L);
+        when(repository.findById(5L)).thenReturn(Optional.empty());
+        assertThrows(BusinessException.class, () -> service.updatePiste(update));
+        verify(repository, never()).save(any(Piste.class));
+    }
+
+    @Test
+    void rejectsDeletingAssignedPisteAndMissingOrInvalidReads() {
+        Piste assigned = piste();
+        assigned.setNumPiste(1L);
+        assigned.getSkiers().add(new com.example.gestionstationskii.entities.Skier());
+        when(repository.findById(1L)).thenReturn(Optional.of(assigned));
+        assertThrows(BusinessException.class, () -> service.removePiste(1L));
+        assertThrows(BusinessException.class, () -> service.retrievePiste(0L));
+
+        when(repository.findById(2L)).thenReturn(Optional.empty());
+        assertThrows(BusinessException.class, () -> service.retrievePiste(2L));
+        verify(repository, never()).delete(any(Piste.class));
+    }
+
+    @Test
+    void searchesByOptionalColorAndReturnsSkiers() {
+        Piste blue = piste();
+        Piste red = piste();
+        red.setColor(Color.RED);
+        com.example.gestionstationskii.entities.Skier skier = new com.example.gestionstationskii.entities.Skier();
+        red.getSkiers().add(skier);
+        when(repository.findAll()).thenReturn(java.util.Arrays.asList(blue, red));
+        when(repository.findById(2L)).thenReturn(Optional.of(red));
+
+        assertEquals(2, service.search(null).size());
+        assertEquals(Collections.singletonList(red), service.search(Color.RED));
+        assertEquals(Collections.singleton(skier), service.skiers(2L));
+    }
 }

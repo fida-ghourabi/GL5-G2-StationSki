@@ -37,16 +37,12 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     private void validate(Subscription subscription) {
         Checks.require(subscription.getTypeSub() != null && subscription.getStartDate() != null, "Type et date de début requis");
         Checks.price(subscription.getPrice());
-        switch (subscription.getTypeSub()) {
-            case ANNUAL:
-                subscription.setEndDate(subscription.getStartDate().plusYears(1));
-                break;
-            case SEMESTRIEL:
-                subscription.setEndDate(subscription.getStartDate().plusMonths(6));
-                break;
-            case MONTHLY:
-                subscription.setEndDate(subscription.getStartDate().plusMonths(1));
-                break;
+        if (subscription.getTypeSub() == TypeSubscription.ANNUAL) {
+            subscription.setEndDate(subscription.getStartDate().plusYears(1));
+        } else if (subscription.getTypeSub() == TypeSubscription.SEMESTRIEL) {
+            subscription.setEndDate(subscription.getStartDate().plusMonths(6));
+        } else {
+            subscription.setEndDate(subscription.getStartDate().plusMonths(1));
         }
         log.debug("Abonnement validé : type={}, début={}, fin={}",
                 subscription.getTypeSub(), subscription.getStartDate(), subscription.getEndDate());
@@ -75,6 +71,10 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     @Override
     @Transactional(readOnly = true)
     public Subscription retrieveSubscriptionById(Long numSubscription) {
+        return findSubscription(numSubscription);
+    }
+
+    private Subscription findSubscription(Long numSubscription) {
         Checks.id(numSubscription);
         Subscription subscription = subscriptionRepository.findById(numSubscription)
                 .orElseThrow(() -> BusinessException.missing(SUBSCRIPTION_RESOURCE));
@@ -132,7 +132,7 @@ public class SubscriptionServicesImpl implements ISubscriptionServices {
     @Override
     @Transactional(readOnly = true)
     public String status(Long id, LocalDate asOf) {
-        Subscription sub = retrieveSubscriptionById(id);
+        Subscription sub = findSubscription(id);
         Checks.require(asOf != null, "Date de référence requise");
         if (sub.getStartDate() == null || sub.getEndDate() == null) throw BusinessException.conflict("Abonnement historique sans dates : corriger les données");
         String status;

@@ -78,7 +78,7 @@ public class RegistrationServicesImpl implements IRegistrationServices {
     public PlanningSlot nextAvailableSlot(Long courseId) {
         log.debug("Finding next available slot for course {}", courseId);
         return slotRepository.findAll().stream().filter(s -> s.getCourse().getNumCourse().equals(courseId)
-                && s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(java.time.LocalDateTime.now()))
+                && s.getStatus() == SlotStatus.OPEN && s.getStartTime().isAfter(java.time.LocalDateTime.now(ZoneId.systemDefault())))
                 .min(java.util.Comparator.comparing(PlanningSlot::getStartTime))
                 .orElseThrow(() -> BusinessException.conflict("Aucun créneau disponible pour ce cours"));
     }

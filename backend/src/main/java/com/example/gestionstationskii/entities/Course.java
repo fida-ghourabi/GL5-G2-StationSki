@@ -31,12 +31,6 @@ public class Course implements Serializable {
 	@Enumerated(EnumType.STRING)
 	Support support;
 	Float price;
-	/**
-	 * Legacy display value; precise scheduling is stored in PlanningSlot.
-	 * @deprecated Retained for compatibility with existing data and clients; remove after migration.
-	 */
-	@Deprecated
-	private int timeSlot;
 
 	@JsonIgnore
 	@OneToMany(mappedBy= "course")

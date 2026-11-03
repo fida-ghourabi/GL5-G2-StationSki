@@ -95,7 +95,6 @@ class CourseServicesWithoutMockitoTest {
         course.setTypeCourse(type);
         course.setSupport(support);
         course.setPrice(100F);
-        course.setTimeSlot(1);
         return course;
     }
 }

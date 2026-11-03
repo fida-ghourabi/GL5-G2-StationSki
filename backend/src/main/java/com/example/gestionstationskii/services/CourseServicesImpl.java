@@ -63,7 +63,6 @@ public class CourseServicesImpl implements ICourseServices {
         current.setTypeCourse(course.getTypeCourse());
         current.setSupport(course.getSupport());
         current.setPrice(course.getPrice());
-        current.setTimeSlot(course.getTimeSlot());
         Course saved = courseRepository.save(current);
         log.info("Course id={} updated", saved.getNumCourse());
         return saved;
@@ -73,6 +72,10 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public Course retrieveCourse(Long numCourse) {
         log.debug("Retrieving course id={}", numCourse);
+        return findCourse(numCourse);
+    }
+
+    private Course findCourse(Long numCourse) {
         Checks.id(numCourse);
         return courseRepository.findById(numCourse).orElseThrow(() -> {
             log.warn("Course id={} not found", numCourse);
@@ -81,19 +84,18 @@ public class CourseServicesImpl implements ICourseServices {
     }
 
     private void validate(Course course) {
-        log.debug("Validating course: level={}, type={}, support={}, price={}, timeSlot={}",
+        log.debug("Validating course: level={}, type={}, support={}, price={}",
                 course.getLevel(), course.getTypeCourse(), course.getSupport(),
-                course.getPrice(), course.getTimeSlot());
+                course.getPrice());
         Checks.require(course.getLevel() > 0 && course.getTypeCourse() != null && course.getSupport() != null,
                 "Niveau positif, type et support requis");
         Checks.price(course.getPrice());
-        Checks.require(course.getTimeSlot() >= 0, "Ancien timeSlot positif ou nul requis");
     }
 
     @Override
     public void removeCourse(Long id) {
         log.debug("Removing course id={}", id);
-        Course course = retrieveCourse(id);
+        Course course = findCourse(id);
         if (registrationRepository.existsByCourse_NumCourse(id)
                 || slotRepository.existsByCourse_NumCourse(id)
                 || !instructorRepository.findByCourses_NumCourse(id).isEmpty()) {
@@ -122,7 +124,7 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public List<Registration> registrations(Long id) {
         log.debug("Retrieving registrations of course id={}", id);
-        retrieveCourse(id);
+        findCourse(id);
         List<Registration> registrations = registrationRepository.findByCourse_NumCourse(id);
         log.info("{} registration(s) found for course id={}", registrations.size(), id);
         return registrations;
@@ -132,7 +134,8 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public long participants(Long id) {
         log.debug("Counting participants of course id={}", id);
-        long count = registrations(id).stream()
+        findCourse(id);
+        long count = registrationRepository.findByCourse_NumCourse(id).stream()
                 .filter(r -> !r.isCancelled())
                 .map(r -> r.getSkier().getNumSkier())
                 .distinct()
@@ -145,7 +148,7 @@ public class CourseServicesImpl implements ICourseServices {
     @Transactional(readOnly = true)
     public List<Instructor> instructors(Long id) {
         log.debug("Retrieving instructors of course id={}", id);
-        retrieveCourse(id);
+        findCourse(id);
         List<Instructor> instructors = instructorRepository.findByCourses_NumCourse(id);
         log.info("{} instructor(s) found for course id={}", instructors.size(), id);
         return instructors;

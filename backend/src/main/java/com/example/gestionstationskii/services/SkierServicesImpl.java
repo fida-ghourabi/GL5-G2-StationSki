@@ -87,7 +87,7 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     public void removeSkier(Long numSkier) {
         logged("delete", numSkier, () -> {
-        Skier skier = retrieveSkier(numSkier);
+        Skier skier = findSkier(numSkier);
         if (registrationRepository.existsBySkier_NumSkier(numSkier)
                 || paymentRepository.existsBySkier_NumSkier(numSkier))
             throw BusinessException.conflict("Skieur ayant un historique d'inscription ou de paiement : suppression refusée");
@@ -100,10 +100,12 @@ public class SkierServicesImpl implements ISkierServices {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Skier retrieveSkier(Long numSkier) {
-        return logged("read", numSkier, () -> {
-            Checks.id(numSkier);
-            return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
-        });
+        return logged("read", numSkier, () -> findSkier(numSkier));
+    }
+
+    private Skier findSkier(Long numSkier) {
+        Checks.id(numSkier);
+        return skierRepository.findById(numSkier).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));
     }
 
     @Override
@@ -140,11 +142,12 @@ public class SkierServicesImpl implements ISkierServices {
 
     private void validate(Skier skier) {
         Checks.text(skier.getFirstName(), "Prénom"); Checks.text(skier.getLastName(), "Nom"); Checks.text(skier.getCity(), "Ville");
-        Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(java.time.LocalDate.now()), "Date de naissance passée requise");
+        Checks.require(skier.getDateOfBirth() != null && skier.getDateOfBirth().isBefore(java.time.LocalDate.now(java.time.ZoneId.systemDefault())), "Date de naissance passée requise");
     }
     @Override
     public Skier updateSkier(Skier input) {
         return logged("update", input == null ? null : input.getNumSkier(), () -> {
+        Checks.require(input != null, "Skieur requis");
         validate(input);
         Checks.id(input.getNumSkier());
         Skier current = skierRepository.lockById(input.getNumSkier()).orElseThrow(() -> BusinessException.missing(SKIER_RESOURCE));

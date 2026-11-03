@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.ConcurrencyFailureException;
 
 import javax.persistence.EntityManager;
 import java.time.LocalDate;
@@ -77,6 +78,16 @@ class RegistrationServicesMockTest {
                 () -> service.registerSlot(10L, 30L));
 
         assertSame(failure, thrown);
+    }
+
+    @Test
+    void registerSlotRethrowsConcurrencyFailureOnSave() {
+        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+        ConcurrencyFailureException failure = new ConcurrencyFailureException("concurrent registration");
+        when(registrations.save(any(Registration.class))).thenThrow(failure);
+
+        assertSame(failure, assertThrows(ConcurrencyFailureException.class,
+                () -> service.registerSlot(10L, 30L)));
     }
 
     @Test
@@ -193,6 +204,23 @@ class RegistrationServicesMockTest {
     }
 
     @Test
+    void registerSlotAllowsDifferentCourseAndDifferentIsoYear() {
+        LocalDateTime requestedTime = LocalDate.of(2031, 1, 6).atTime(10, 0);
+        openSlot.setStartTime(requestedTime);
+        openSlot.setEndTime(requestedTime.plusHours(1));
+        Course otherCourse = course(24L, TypeCourse.COLLECTIVE_ADULT);
+        PlanningSlot differentCourseSlot = slot(35L, otherCourse, requestedTime.plusHours(2), 4, SlotStatus.OPEN);
+        Registration differentCourseRegistration = registration(adult, differentCourseSlot, otherCourse, false);
+        PlanningSlot other = slot(34L, adultCourse, LocalDate.of(2030, 1, 7).atTime(10, 0), 4, SlotStatus.OPEN);
+        Registration existing = registration(adult, other, adultCourse, false);
+        prepareRegistration(adult, openSlot, Arrays.asList(differentCourseRegistration, existing),
+                Collections.<Registration>emptyList());
+        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertSame(openSlot, service.registerSlot(10L, 30L).getPlanningSlot());
+    }
+
+    @Test
     void registerSlotIgnoresCancelledRegistrationAndRegistrationOnCancelledSlotForConflictChecks() {
         PlanningSlot cancelledRegistrationSlot = slot(40L, adultCourse, openSlot.getStartTime(), 2, SlotStatus.OPEN);
         PlanningSlot cancelledSlot = slot(41L, adultCourse, openSlot.getStartTime(), 2, SlotStatus.CANCELLED);
@@ -216,6 +244,26 @@ class RegistrationServicesMockTest {
         prepareRegistration(adult, openSlot, Collections.singletonList(historical), Collections.<Registration>emptyList());
         assertTrue(assertThrows(BusinessException.class, () -> service.registerSlot(10L, 30L))
                 .getMessage().contains("année inconnue"));
+    }
+
+    @Test
+    void registerSlotAllowsNonMatchingLegacyHistory() {
+        Registration differentCourse = new Registration();
+        differentCourse.setSkier(adult);
+        differentCourse.setCourse(course(25L, TypeCourse.COLLECTIVE_ADULT));
+        differentCourse.setNumWeek(openSlot.getStartTime().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+        Registration differentWeek = new Registration();
+        differentWeek.setSkier(adult);
+        differentWeek.setCourse(adultCourse);
+        differentWeek.setNumWeek(1);
+        Registration withoutCourse = new Registration();
+        withoutCourse.setSkier(adult);
+        withoutCourse.setNumWeek(openSlot.getStartTime().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+        prepareRegistration(adult, openSlot, Arrays.asList(differentCourse, differentWeek, withoutCourse),
+                Collections.<Registration>emptyList());
+        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertSame(openSlot, service.registerSlot(10L, 30L).getPlanningSlot());
     }
 
     @Test
@@ -253,6 +301,15 @@ class RegistrationServicesMockTest {
         BusinessException error = assertThrows(BusinessException.class, () -> service.nextAvailableSlot(20L));
 
         assertEquals(HttpStatus.CONFLICT, error.getStatus());
+    }
+
+    @Test
+    void nextAvailableSlotIgnoresPastOpenSlots() {
+        PlanningSlot pastOpen = slot(44L, adultCourse, LocalDateTime.now().minusDays(1), 2, SlotStatus.OPEN);
+        when(slots.findAll()).thenReturn(Collections.singletonList(pastOpen));
+
+        assertEquals(HttpStatus.CONFLICT,
+                assertThrows(BusinessException.class, () -> service.nextAvailableSlot(20L)).getStatus());
     }
 
     @Test
@@ -363,6 +420,17 @@ class RegistrationServicesMockTest {
     }
 
     @Test
+    void searchRejectsMissingPeriodBoundaries() {
+        LocalDateTime from = LocalDateTime.of(2030, 1, 7, 9, 0);
+        LocalDateTime to = from.plusHours(1);
+
+        assertEquals(HttpStatus.BAD_REQUEST,
+                assertThrows(BusinessException.class, () -> service.search(null, to, null)).getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST,
+                assertThrows(BusinessException.class, () -> service.search(from, null, null)).getStatus());
+    }
+
+    @Test
     void addAndAssignToSkierRequiresNewRegistrationAndPlanningSlot() {
         Registration noSlot = new Registration();
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
@@ -371,6 +439,19 @@ class RegistrationServicesMockTest {
         noSlot.setPlanningSlot(openSlot);
         assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
                 () -> service.addRegistrationAndAssignToSkier(noSlot, 10L)).getStatus());
+    }
+
+    @Test
+    void addAndAssignToSkierRegistersValidInput() {
+        Registration input = new Registration();
+        input.setPlanningSlot(openSlot);
+        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Registration result = service.addRegistrationAndAssignToSkier(input, 10L);
+
+        assertSame(openSlot, result.getPlanningSlot());
+        assertSame(adult, result.getSkier());
     }
 
     @Test
@@ -386,6 +467,52 @@ class RegistrationServicesMockTest {
     }
 
     @Test
+    void addAndAssignToCourseRejectsMissingCourse() {
+        when(courses.existsById(60L)).thenReturn(false);
+        Registration input = new Registration();
+        input.setPlanningSlot(openSlot);
+
+        assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class,
+                () -> service.addRegistrationAndAssignToSkierAndCourse(input, 10L, 60L)).getStatus());
+    }
+
+    @Test
+    void addAndAssignToCourseRejectsExistingRegistrationIdentifier() {
+        when(courses.existsById(20L)).thenReturn(true);
+        Registration input = new Registration();
+        input.setNumRegistration(72L);
+        input.setPlanningSlot(openSlot);
+
+        assertEquals(HttpStatus.BAD_REQUEST, assertThrows(BusinessException.class,
+                () -> service.addRegistrationAndAssignToSkierAndCourse(input, 10L, 20L)).getStatus());
+    }
+
+    @Test
+    void addAndAssignToCourseAcceptsMatchingSlot() {
+        when(courses.existsById(20L)).thenReturn(true);
+        when(slots.findById(30L)).thenReturn(Optional.of(openSlot));
+        prepareRegistration(adult, openSlot, Collections.<Registration>emptyList(), Collections.<Registration>emptyList());
+        when(registrations.save(any(Registration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Registration input = new Registration();
+        input.setPlanningSlot(openSlot);
+
+        assertSame(openSlot, service.addRegistrationAndAssignToSkierAndCourse(input, 10L, 20L).getPlanningSlot());
+    }
+
+    @Test
+    void assignRegistrationToCourseReportsMissingRegistrationOrCourse() {
+        when(registrations.findById(70L)).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class,
+                () -> service.assignRegistrationToCourse(70L, 20L)).getStatus());
+
+        Registration existing = registration(adult, openSlot, adultCourse, false);
+        when(registrations.findById(70L)).thenReturn(Optional.of(existing));
+        when(courses.existsById(20L)).thenReturn(false);
+        assertEquals(HttpStatus.NOT_FOUND, assertThrows(BusinessException.class,
+                () -> service.assignRegistrationToCourse(70L, 20L)).getStatus());
+    }
+
+    @Test
     void assignRegistrationToCourseAllowsSameCourseButRejectsChangingCourse() {
         Registration existing = registration(adult, openSlot, adultCourse, false);
         when(registrations.findById(70L)).thenReturn(Optional.of(existing));
@@ -398,6 +525,16 @@ class RegistrationServicesMockTest {
         existing.setCancelled(true);
         assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
                 () -> service.assignRegistrationToCourse(70L, 20L)).getStatus());
+    }
+
+    @Test
+    void assignRegistrationToCourseRejectsRegistrationWithoutCourse() {
+        Registration existing = registration(adult, openSlot, null, false);
+        when(registrations.findById(71L)).thenReturn(Optional.of(existing));
+        when(courses.existsById(20L)).thenReturn(true);
+
+        assertEquals(HttpStatus.CONFLICT, assertThrows(BusinessException.class,
+                () -> service.assignRegistrationToCourse(71L, 20L)).getStatus());
     }
 
     @Test

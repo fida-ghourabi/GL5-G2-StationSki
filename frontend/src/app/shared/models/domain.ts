@@ -9,7 +9,7 @@ export type PaymentMethod = 'CARD' | 'CASH' | 'BANK_TRANSFER';
 export interface Subscription extends Entity { numSub: number; startDate: string; endDate: string; price: number; typeSub: SubscriptionType }
 export interface Skier extends Entity { numSkier: number; firstName: string; lastName: string; city: string; dateOfBirth: string; subscription?: Subscription }
 export interface Piste extends Entity { numPiste: number; namePiste: string; color: PisteColor; length: number; slope: number }
-export interface Course extends Entity { numCourse: number; level: number; typeCourse: CourseType; support: Support; price: number; timeSlot: number }
+export interface Course extends Entity { numCourse: number; level: number; typeCourse: CourseType; support: Support; price: number }
 export interface Instructor extends Entity { numInstructor: number; firstName: string; lastName: string; dateOfHire: string; courses: Course[] }
 export interface PlanningSlot extends Entity { id: number; course: Course; instructor: Instructor; startTime: string; endTime: string; maxCapacity: number; status: SlotStatus }
 export interface Availability extends Entity { id: number; instructor: Instructor; dayOfWeek: string; startTime: string; endTime: string; validFrom: string; validUntil: string }

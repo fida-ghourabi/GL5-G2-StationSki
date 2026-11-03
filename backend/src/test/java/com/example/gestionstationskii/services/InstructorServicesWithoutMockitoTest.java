@@ -123,7 +123,6 @@ class InstructorServicesWithoutMockitoTest {
         course.setTypeCourse(TypeCourse.INDIVIDUAL);
         course.setSupport(Support.SKI);
         course.setPrice(100F);
-        course.setTimeSlot(1);
         return course;
     }
 }

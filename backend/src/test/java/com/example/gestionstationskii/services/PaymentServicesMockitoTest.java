@@ -51,7 +51,7 @@ class PaymentServicesMockitoTest {
             return payment;
         });
 
-        Payment result = service.record(input);
+        Payment result = service.recordPayment(input);
 
         assertEquals(10L, result.getId());
         assertEquals(PaymentStatus.PENDING, result.getStatus());
@@ -66,7 +66,7 @@ class PaymentServicesMockitoTest {
         Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
         input.setMethod(null);
 
-        assertThrows(BusinessException.class, () -> service.record(input));
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
 
         verifyNoInteractions(skiers, subscriptions, payments);
     }
@@ -76,8 +76,8 @@ class PaymentServicesMockitoTest {
         Requests.PaymentInput zero = paymentInput(1L, 2L, "0.00");
         Requests.PaymentInput negative = paymentInput(1L, 2L, "-1.00");
 
-        assertThrows(BusinessException.class, () -> service.record(zero));
-        assertThrows(BusinessException.class, () -> service.record(negative));
+        assertThrows(BusinessException.class, () -> service.recordPayment(zero));
+        assertThrows(BusinessException.class, () -> service.recordPayment(negative));
 
         verifyNoInteractions(skiers, subscriptions, payments);
     }
@@ -87,7 +87,7 @@ class PaymentServicesMockitoTest {
         Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
         when(skiers.lockById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(BusinessException.class, () -> service.record(input));
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
 
         verify(subscriptions, never()).lockById(any());
     }
@@ -98,7 +98,7 @@ class PaymentServicesMockitoTest {
         when(skiers.lockById(1L)).thenReturn(Optional.of(skier(1L)));
         when(subscriptions.lockById(2L)).thenReturn(Optional.empty());
 
-        assertThrows(BusinessException.class, () -> service.record(input));
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
 
         verify(payments, never()).save(any());
     }
@@ -110,8 +110,20 @@ class PaymentServicesMockitoTest {
         when(skiers.lockById(1L)).thenReturn(Optional.of(skier));
         when(subscriptions.lockById(2L)).thenReturn(Optional.of(subscription(2L)));
 
-        assertThrows(BusinessException.class, () -> service.record(paymentInput(1L, 2L, "100.00")));
+        Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
 
+        verify(payments, never()).save(any());
+    }
+
+    @Test
+    void recordRejectsSkierWithoutSubscription() {
+        when(skiers.lockById(1L)).thenReturn(Optional.of(skier(1L)));
+        when(subscriptions.lockById(2L)).thenReturn(Optional.of(subscription(2L)));
+
+        Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
+        assertThrows(BusinessException.class,
+                () -> service.recordPayment(input));
         verify(payments, never()).save(any());
     }
 
@@ -127,7 +139,7 @@ class PaymentServicesMockitoTest {
         Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
         input.setTransactionReference("TX-1");
 
-        assertThrows(BusinessException.class, () -> service.record(input));
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
 
         verify(payments, never()).save(any());
     }
@@ -143,7 +155,7 @@ class PaymentServicesMockitoTest {
         Requests.PaymentInput input = paymentInput(1L, 2L, "100.00");
         input.setTransactionReference("x".repeat(256));
 
-        assertThrows(BusinessException.class, () -> service.record(input));
+        assertThrows(BusinessException.class, () -> service.recordPayment(input));
         verify(payments, never()).save(any());
     }
 
@@ -212,6 +224,15 @@ class PaymentServicesMockitoTest {
     }
 
     @Test
+    void changeStatusRejectsMissingPayment() {
+        Requests.PaymentState input = new Requests.PaymentState();
+        input.setStatus(PaymentStatus.PAID);
+        when(payments.lockById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> service.changeStatus(99L, input));
+    }
+
+    @Test
     void changeStatusRejectsInvalidTransition() {
         Payment payment = payment(1L, PaymentStatus.PAID);
         Requests.PaymentState input = new Requests.PaymentState();
@@ -220,6 +241,17 @@ class PaymentServicesMockitoTest {
 
         assertThrows(BusinessException.class, () -> service.changeStatus(1L, input));
         assertEquals(PaymentStatus.PAID, payment.getStatus());
+    }
+
+    @Test
+    void changeStatusRejectsUnsupportedTargetFromPending() {
+        Payment payment = payment(1L, PaymentStatus.PENDING);
+        Requests.PaymentState input = new Requests.PaymentState();
+        input.setStatus(PaymentStatus.REFUNDED);
+        when(payments.lockById(1L)).thenReturn(Optional.of(payment));
+
+        assertThrows(BusinessException.class, () -> service.changeStatus(1L, input));
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
     }
 
     @Test
@@ -254,7 +286,8 @@ class PaymentServicesMockitoTest {
         Payment payment = payment(1L, PaymentStatus.PENDING);
         when(payments.lockById(1L)).thenReturn(Optional.of(payment));
 
-        assertThrows(BusinessException.class, () -> service.refund(1L, refundInput("10.00", "Correction")));
+        Requests.RefundInput input = refundInput("10.00", "Correction");
+        assertThrows(BusinessException.class, () -> service.refund(1L, input));
 
         verify(refunds, never()).save(any());
     }
@@ -265,7 +298,8 @@ class PaymentServicesMockitoTest {
         payment.setRefundedAmount(new BigDecimal("75.00"));
         when(payments.lockById(1L)).thenReturn(Optional.of(payment));
 
-        assertThrows(BusinessException.class, () -> service.refund(1L, refundInput("25.01", "Correction")));
+        Requests.RefundInput input = refundInput("25.01", "Correction");
+        assertThrows(BusinessException.class, () -> service.refund(1L, input));
 
         verify(refunds, never()).save(any());
     }
@@ -276,9 +310,11 @@ class PaymentServicesMockitoTest {
         when(payments.lockById(1L)).thenReturn(Optional.of(payment));
         Requests.RefundInput missingReason = refundInput("10.00", "");
         Requests.RefundInput negativeAmount = refundInput("-1.00", "Correction");
+        Requests.RefundInput zeroAmount = refundInput("0.00", "Correction");
 
         assertThrows(BusinessException.class, () -> service.refund(1L, missingReason));
         assertThrows(BusinessException.class, () -> service.refund(1L, negativeAmount));
+        assertThrows(BusinessException.class, () -> service.refund(1L, zeroAmount));
         verify(payments, never()).lockById(any());
     }
 
@@ -292,6 +328,15 @@ class PaymentServicesMockitoTest {
 
         assertEquals(1, service.bySkier(1L).size());
         assertEquals(1, service.bySubscription(2L).size());
+    }
+
+    @Test
+    void bySkierAndBySubscriptionRejectMissingOwners() {
+        when(skiers.findById(99L)).thenReturn(Optional.empty());
+        when(subscriptions.findById(98L)).thenReturn(Optional.empty());
+
+        assertThrows(BusinessException.class, () -> service.bySkier(99L));
+        assertThrows(BusinessException.class, () -> service.bySubscription(98L));
     }
 
     @Test

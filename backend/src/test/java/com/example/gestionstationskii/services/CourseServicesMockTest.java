@@ -115,13 +115,179 @@ class CourseServicesMockTest {
         verify(courseRepository, never()).delete(any(Course.class));
     }
 
+    @Test
+    void addCourseRejectsPreassignedIdentifier() {
+        Course course = buildCourse();
+        course.setNumCourse(1L);
+
+        assertThrows(BusinessException.class, () -> courseServices.addCourse(course));
+        verifyNoInteractions(courseRepository, registrationRepository, slotRepository, instructorRepository);
+    }
+
+    @Test
+    void addCourseRejectsInvalidPrice() {
+        Course invalidPrice = buildCourse();
+        invalidPrice.setPrice(Float.NaN);
+        assertThrows(BusinessException.class, () -> courseServices.addCourse(invalidPrice));
+
+        verifyNoInteractions(courseRepository, registrationRepository, slotRepository, instructorRepository);
+    }
+
+    @Test
+    void addCourseValidatesLevelTypeAndSupportIndependently() {
+        Course invalidLevel = buildCourse();
+        invalidLevel.setLevel(0);
+        assertThrows(BusinessException.class, () -> courseServices.addCourse(invalidLevel));
+
+        Course missingType = buildCourse();
+        missingType.setTypeCourse(null);
+        assertThrows(BusinessException.class, () -> courseServices.addCourse(missingType));
+
+        Course missingSupport = buildCourse();
+        missingSupport.setSupport(null);
+        assertThrows(BusinessException.class, () -> courseServices.addCourse(missingSupport));
+        verifyNoInteractions(courseRepository);
+    }
+
+    @Test
+    void updateCourseRejectsMissingCourseAndInvalidIdentifier() {
+        Course update = buildCourse();
+        update.setNumCourse(0L);
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(update));
+
+        update.setNumCourse(1L);
+        when(courseRepository.lockById(1L)).thenReturn(Optional.empty());
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(update));
+        verify(courseRepository).lockById(1L);
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    void updateCourseRejectsChangingImmutableFieldsWhenRegisteredOrScheduled() {
+        Course current = buildCourse();
+        current.setNumCourse(1L);
+        Course update = buildCourse();
+        update.setNumCourse(1L);
+        update.setTypeCourse(TypeCourse.COLLECTIVE_ADULT);
+        when(courseRepository.lockById(1L)).thenReturn(Optional.of(current));
+        when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(update));
+        verify(slotRepository, never()).existsByCourse_NumCourse(1L);
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    void updateCourseAllowsPriceChangeWhenLinkedFieldsRemainSame() {
+        Course current = buildCourse();
+        current.setNumCourse(1L);
+        Course update = buildCourse();
+        update.setNumCourse(1L);
+        update.setPrice(150F);
+        when(courseRepository.lockById(1L)).thenReturn(Optional.of(current));
+        when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+        when(courseRepository.save(current)).thenReturn(current);
+
+        assertEquals(150F, courseServices.updateCourse(update).getPrice());
+        verify(courseRepository).save(current);
+    }
+
+    @Test
+    void updateCourseRejectsChangingSupportOrLevelWhenScheduled() {
+        for (int changedField = 0; changedField < 2; changedField++) {
+            Course current = buildCourse();
+            current.setNumCourse(1L);
+            Course update = buildCourse();
+            update.setNumCourse(1L);
+            if (changedField == 0) update.setSupport(Support.SNOWBOARD);
+            else update.setLevel(2);
+            when(courseRepository.lockById(1L)).thenReturn(Optional.of(current));
+            when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(false);
+            when(slotRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+
+            assertThrows(BusinessException.class, () -> courseServices.updateCourse(update));
+        }
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    void removeCourseRefusedWhenSlotOrInstructorLinksExist() {
+        Course course = buildCourse();
+        course.setNumCourse(1L);
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+        when(slotRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(1L));
+        verify(instructorRepository, never()).findByCourses_NumCourse(1L);
+
+        when(slotRepository.existsByCourse_NumCourse(1L)).thenReturn(false);
+        when(instructorRepository.findByCourses_NumCourse(1L))
+                .thenReturn(Collections.singletonList(new Instructor()));
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(1L));
+        verify(courseRepository, never()).delete(any(Course.class));
+    }
+
+    @Test
+    void searchAppliesOptionalFiltersAndRejectsInvalidLevel() {
+        Course matching = buildCourse();
+        Course other = buildCourse();
+        other.setSupport(Support.SNOWBOARD);
+        Course differentTypeAndLevel = buildCourse();
+        differentTypeAndLevel.setTypeCourse(TypeCourse.COLLECTIVE_ADULT);
+        differentTypeAndLevel.setLevel(2);
+        when(courseRepository.findAll()).thenReturn(Arrays.asList(matching, other, differentTypeAndLevel));
+
+        assertEquals(Arrays.asList(matching, other, differentTypeAndLevel), courseServices.search(null, null, null));
+        assertEquals(Collections.singletonList(matching),
+                courseServices.search(TypeCourse.INDIVIDUAL, Support.SKI, 1));
+        assertEquals(Collections.singletonList(other), courseServices.search(null, Support.SNOWBOARD, null));
+        assertEquals(Collections.singletonList(differentTypeAndLevel),
+                courseServices.search(TypeCourse.COLLECTIVE_ADULT, null, null));
+        assertEquals(Collections.singletonList(differentTypeAndLevel), courseServices.search(null, null, 2));
+        assertThrows(BusinessException.class, () -> courseServices.search(null, null, 0));
+    }
+
+    @Test
+    void participantsCountsDistinctNonCancelledSkiers() {
+        Course course = buildCourse();
+        course.setNumCourse(1L);
+        Registration active = new Registration();
+        Skier firstSkier = new Skier();
+        firstSkier.setNumSkier(8L);
+        active.setSkier(firstSkier);
+        Registration duplicate = new Registration();
+        duplicate.setSkier(firstSkier);
+        Registration cancelled = new Registration();
+        cancelled.setCancelled(true);
+        Skier secondSkier = new Skier();
+        secondSkier.setNumSkier(9L);
+        cancelled.setSkier(secondSkier);
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+        when(registrationRepository.findByCourse_NumCourse(1L))
+                .thenReturn(Arrays.asList(active, duplicate, cancelled));
+
+        assertEquals(1L, courseServices.participants(1L));
+    }
+
+    @Test
+    void exposesCourseRegistrationsAndInstructors() {
+        Course course = buildCourse();
+        course.setNumCourse(1L);
+        Registration registration = new Registration();
+        Instructor instructor = new Instructor();
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+        when(registrationRepository.findByCourse_NumCourse(1L)).thenReturn(Collections.singletonList(registration));
+        when(instructorRepository.findByCourses_NumCourse(1L)).thenReturn(Collections.singletonList(instructor));
+
+        assertEquals(Collections.singletonList(registration), courseServices.registrations(1L));
+        assertEquals(Collections.singletonList(instructor), courseServices.instructors(1L));
+    }
+
     private Course buildCourse() {
         Course course = new Course();
         course.setLevel(1);
         course.setTypeCourse(TypeCourse.INDIVIDUAL);
         course.setSupport(Support.SKI);
         course.setPrice(100F);
-        course.setTimeSlot(1);
         return course;
     }
 }

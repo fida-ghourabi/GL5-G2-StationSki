@@ -28,6 +28,7 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     public Piste addPiste(Piste piste) {
         return logged("create", null, () -> {
+        Checks.require(piste != null, "Piste requise");
         Checks.require(piste.getNumPiste() == null, "Identifiant généré à la création");
         validate(piste);
         piste.setSkiers(new java.util.HashSet<>());
@@ -40,7 +41,7 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     public void removePiste(Long numPiste) {
         logged("delete", numPiste, () -> {
-        Piste piste = retrievePiste(numPiste);
+        Piste piste = findPiste(numPiste);
         if (!piste.getSkiers().isEmpty()) throw BusinessException.conflict("Piste affectée à des skieurs : suppression refusée");
         pisteRepository.delete(piste);
         log.info("Piste deletion submitted id={}", numPiste);
@@ -51,10 +52,12 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     @Transactional(readOnly = true)
     public Piste retrievePiste(Long numPiste) {
-        return logged("read", numPiste, () -> {
-            Checks.id(numPiste);
-            return pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
-        });
+        return logged("read", numPiste, () -> findPiste(numPiste));
+    }
+
+    private Piste findPiste(Long numPiste) {
+        Checks.id(numPiste);
+        return pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
     }
     // Calls run inside the service transaction; completion here does not imply commit.
     private <T> T logged(String operation, Long id, java.util.function.Supplier<T> action) {
@@ -77,8 +80,9 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     public Piste updatePiste(Piste input) {
         return logged("update", input == null ? null : input.getNumPiste(), () -> {
+        Checks.require(input != null, "Piste requise");
         validate(input);
-        Piste current = retrievePiste(input.getNumPiste());
+        Piste current = findPiste(input.getNumPiste());
         current.setNamePiste(input.getNamePiste()); current.setColor(input.getColor());
         current.setLength(input.getLength()); current.setSlope(input.getSlope());
         Piste saved = pisteRepository.save(current);
@@ -94,5 +98,5 @@ public class PisteServicesImpl implements IPisteServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public java.util.Set<Skier> skiers(Long id) { return retrievePiste(id).getSkiers(); }
+    public java.util.Set<Skier> skiers(Long id) { return findPiste(id).getSkiers(); }
 }

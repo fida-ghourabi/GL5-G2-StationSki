@@ -24,6 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class RequestsMappingTest {
 
     @Test
+    void registrationInputCarriesPlanningSlotReferenceIdentifier() {
+        Requests.PlanningSlotReference reference = new Requests.PlanningSlotReference();
+        reference.setId(41L);
+        Requests.RegistrationInput input = new Requests.RegistrationInput();
+        input.setPlanningSlot(reference);
+
+        assertEquals(41L, input.getPlanningSlot().getId());
+    }
+
+    @Test
     void courseInputMapsAllFields() {
         Requests.CourseInput input = new Requests.CourseInput();
         input.setNumCourse(12L);
@@ -31,7 +41,6 @@ class RequestsMappingTest {
         input.setTypeCourse(TypeCourse.COLLECTIVE_ADULT);
         input.setSupport(Support.SNOWBOARD);
         input.setPrice(125.5f);
-        input.setTimeSlot(2);
 
         Course course = input.toEntity();
 
@@ -40,7 +49,6 @@ class RequestsMappingTest {
         assertEquals(TypeCourse.COLLECTIVE_ADULT, course.getTypeCourse());
         assertEquals(Support.SNOWBOARD, course.getSupport());
         assertEquals(125.5f, course.getPrice(), 0.001f);
-        assertEquals(2, course.getTimeSlot());
     }
 
     @Test

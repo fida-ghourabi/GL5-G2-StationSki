@@ -26,5 +26,8 @@ public class Instructor implements Serializable {
 	String lastName;
 	LocalDate dateOfHire;
 	@OneToMany
+	@JoinTable(name = "instructor_courses",
+			joinColumns = @JoinColumn(name = "instructor_num_instructor"),
+			inverseJoinColumns = @JoinColumn(name = "courses_num_course"))
 	private Set<Course> courses;
 }

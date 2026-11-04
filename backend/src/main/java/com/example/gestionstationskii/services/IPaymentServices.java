@@ -8,7 +8,7 @@ import com.example.gestionstationskii.entities.Refund;
 import java.util.List;
 
 public interface IPaymentServices {
-    Payment record(Requests.PaymentInput input);
+    Payment recordPayment(Requests.PaymentInput input);
 
     Payment get(Long id);
 

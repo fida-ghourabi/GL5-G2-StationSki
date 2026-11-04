@@ -3,6 +3,7 @@ package com.example.gestionstationskii.controllers;
 import com.example.gestionstationskii.entities.Piste;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import com.example.gestionstationskii.services.*;
@@ -21,7 +22,7 @@ public class PisteRestController {
 
     @Operation(summary = "Modifier une piste")
     @PutMapping("/update")
-    public Piste update(@RequestBody Piste piste) { return pisteServices.updatePiste(piste); }
+    public Piste update(@RequestBody Requests.PisteInput piste) { return pisteServices.updatePiste(piste.toEntity()); }
 
     @Operation(summary = "Filtrer les pistes par couleur / difficulté")
     @GetMapping("/search")
@@ -33,8 +34,8 @@ public class PisteRestController {
 
     @Operation(description = "Add Piste")
     @PostMapping("/add")
-    public Piste addPiste(@RequestBody Piste piste){
-        return  pisteServices.addPiste(piste);
+    public Piste addPiste(@RequestBody Requests.PisteInput piste){
+        return  pisteServices.addPiste(piste.toEntity());
     }
     @Operation(description = "Retrieve all Pistes")
     @GetMapping("/all")

@@ -2,6 +2,7 @@ package com.example.gestionstationskii.controllers;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.example.gestionstationskii.dto.Requests;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +33,7 @@ public class SubscriptionRestController {
     @Operation(summary = "Statut calculé de l'abonnement à une date donnée")
     @GetMapping("/{id}/status")
     public String status(@PathVariable Long id,
-            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate asOf) {
+                         @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate asOf) {
         log.debug("Requête de statut d'abonnement reçue : id={}, date={}", id, asOf);
         String status = subscriptionServices.status(id, asOf);
         log.debug("Réponse de statut d'abonnement : id={}, statut={}", id, status);
@@ -41,7 +42,8 @@ public class SubscriptionRestController {
 
     @Operation(description = "Add Subscription ")
     @PostMapping("/add")
-    public Subscription addSubscription(@RequestBody Subscription subscription){
+    public Subscription addSubscription(@RequestBody Requests.SubscriptionInput input){
+        Subscription subscription = input.toEntity();
         log.debug("Requête de création d'abonnement reçue : type={}, début={}",
                 subscription.getTypeSub(), subscription.getStartDate());
         Subscription saved = subscriptionServices.addSubscription(subscription);
@@ -68,7 +70,8 @@ public class SubscriptionRestController {
     }
     @Operation(description = "Update Subscription ")
     @PutMapping("/update")
-    public Subscription updateSubscription(@RequestBody Subscription subscription){
+    public Subscription updateSubscription(@RequestBody Requests.SubscriptionInput input){
+        Subscription subscription = input.toEntity();
         log.debug("Requête de mise à jour d'abonnement reçue : id={}", subscription.getNumSub());
         Subscription updated = subscriptionServices.updateSubscription(subscription);
         log.info("Requête de mise à jour d'abonnement terminée : id={}", updated.getNumSub());

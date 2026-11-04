@@ -30,7 +30,7 @@ public class PisteServicesImpl implements IPisteServices {
 
     @Override
     public void removePiste(Long numPiste) {
-        Piste piste = retrievePiste(numPiste);
+        Piste piste = findPiste(numPiste);
         if (!piste.getSkiers().isEmpty()) throw BusinessException.conflict("Piste affectée à des skieurs : suppression refusée");
         pisteRepository.delete(piste);
     }
@@ -38,6 +38,9 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     @Transactional(readOnly = true)
     public Piste retrievePiste(Long numPiste) {
+        return findPiste(numPiste);
+    }
+    private Piste findPiste(Long numPiste) {
         Checks.id(numPiste);
         return pisteRepository.findById(numPiste).orElseThrow(() -> BusinessException.missing("Piste"));
     }
@@ -49,7 +52,7 @@ public class PisteServicesImpl implements IPisteServices {
     @Override
     public Piste updatePiste(Piste input) {
         validate(input);
-        Piste current = retrievePiste(input.getNumPiste());
+        Piste current = findPiste(input.getNumPiste());
         current.setNamePiste(input.getNamePiste()); current.setColor(input.getColor());
         current.setLength(input.getLength()); current.setSlope(input.getSlope());
         return pisteRepository.save(current);
@@ -61,5 +64,5 @@ public class PisteServicesImpl implements IPisteServices {
     }
     @Override
     @Transactional(readOnly = true)
-    public java.util.Set<Skier> skiers(Long id) { return retrievePiste(id).getSkiers(); }
+    public java.util.Set<Skier> skiers(Long id) { return findPiste(id).getSkiers(); }
 }

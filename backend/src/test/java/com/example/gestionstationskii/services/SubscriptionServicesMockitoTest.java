@@ -242,30 +242,34 @@ class SubscriptionServicesMockitoTest {
 
     @Test
     void retrieveSubscriptionsByDatesRejectsMissingStartDate() {
+        LocalDate today = LocalDate.now();
+
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(null, LocalDate.now())
+                () -> service.retrieveSubscriptionsByDates(null, today)
         );
         verifyNoInteractions(subscriptionRepository);
     }
 
     @Test
     void retrieveSubscriptionsByDatesRejectsMissingEndDate() {
+        LocalDate today = LocalDate.now();
+
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(LocalDate.now(), null)
+                () -> service.retrieveSubscriptionsByDates(today, null)
         );
         verifyNoInteractions(subscriptionRepository);
     }
 
     @Test
     void retrieveSubscriptionsByDatesRejectsReversedPeriod() {
+        LocalDate laterDate = LocalDate.of(2026, 2, 1);
+        LocalDate earlierDate = LocalDate.of(2026, 1, 1);
+
         assertThrows(
                 BusinessException.class,
-                () -> service.retrieveSubscriptionsByDates(
-                        LocalDate.of(2026, 2, 1),
-                        LocalDate.of(2026, 1, 1)
-                )
+                () -> service.retrieveSubscriptionsByDates(laterDate, earlierDate)
         );
         verifyNoInteractions(subscriptionRepository);
     }
@@ -375,7 +379,9 @@ class SubscriptionServicesMockitoTest {
         subscription.setStartDate(null);
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(subscription));
 
-        assertThrows(BusinessException.class, () -> service.status(1L, LocalDate.now()));
+        LocalDate today = LocalDate.now();
+
+        assertThrows(BusinessException.class, () -> service.status(1L, today));
     }
 
     @Test
@@ -384,7 +390,9 @@ class SubscriptionServicesMockitoTest {
         subscription.setEndDate(null);
         when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(subscription));
 
-        assertThrows(BusinessException.class, () -> service.status(1L, LocalDate.now()));
+        LocalDate today = LocalDate.now();
+
+        assertThrows(BusinessException.class, () -> service.status(1L, today));
     }
 
     private static Subscription subscription(Long id, TypeSubscription type) {

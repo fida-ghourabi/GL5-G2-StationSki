@@ -1,0 +1,46 @@
+# kube-prometheus-stack : version allegee pour un cluster de 3 x t3.medium
+alertmanager:
+  enabled: false
+
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30300
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+
+prometheus:
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    retention: 3d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 800Mi
+      limits:
+        memory: 1500Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: ebs-gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+# Composants du plan de controle non accessibles sur EKS (evite de fausses alertes)
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

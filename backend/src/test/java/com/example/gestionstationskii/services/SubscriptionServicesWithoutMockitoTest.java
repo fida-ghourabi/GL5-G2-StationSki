@@ -17,6 +17,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -131,7 +132,8 @@ class SubscriptionServicesWithoutMockitoTest {
 
         subscriptionService.removeSubscription(saved.getNumSub());
 
-        assertTrue(subscriptionRepository.findById(saved.getNumSub()).isEmpty());
+        // Java 8 : Optional.isEmpty() n'existe pas (Java 11+)
+        assertFalse(subscriptionRepository.findById(saved.getNumSub()).isPresent());
     }
 
     @Test

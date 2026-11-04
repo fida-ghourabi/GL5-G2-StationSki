@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -22,7 +23,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     private final ISubscriptionRepository subscriptions;
 
     @Override
-    public Payment record(Requests.PaymentInput input) {
+    public Payment recordPayment(Requests.PaymentInput input) {
         log.debug("Enregistrement d'un paiement demandé : skieur={}, abonnement={}",
                 input.getSkierId(), input.getSubscriptionId());
         Checks.id(input.getSkierId()); Checks.id(input.getSubscriptionId()); Checks.money(input.getAmount());
@@ -37,7 +38,7 @@ public class PaymentServicesImpl implements IPaymentServices {
             if (payments.existsByTransactionReference(reference)) throw BusinessException.conflict("Référence de transaction déjà enregistrée");
         }
         Payment p = new Payment(); p.setSkier(skier); p.setSubscription(sub); p.setAmount(input.getAmount());
-        p.setMethod(input.getMethod()); p.setPaymentDate(LocalDateTime.now()); p.setStatus(PaymentStatus.PENDING);
+        p.setMethod(input.getMethod()); p.setPaymentDate(LocalDateTime.now(ZoneId.systemDefault())); p.setStatus(PaymentStatus.PENDING);
         p.setTransactionReference(reference); p.setReceiptNumber("SKI-" + UUID.randomUUID().toString());
         Payment saved = payments.save(p);
         log.info("Paiement enregistré : id={}, montant={}, statut={}",
@@ -47,10 +48,13 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Override
     @Transactional(readOnly = true)
     public Payment get(Long id) {
-        Checks.id(id);
-        Payment payment = payments.findById(id).orElseThrow(() -> BusinessException.missing("Paiement"));
+        Payment payment = find(id);
         log.debug("Paiement récupéré : id={}", id);
         return payment;
+    }
+    private Payment find(Long id) {
+        Checks.id(id);
+        return payments.findById(id).orElseThrow(() -> BusinessException.missing("Paiement"));
     }
     private Payment locked(Long id) { Checks.id(id); return payments.lockById(id).orElseThrow(() -> BusinessException.missing("Paiement")); }
     @Override
@@ -65,7 +69,7 @@ public class PaymentServicesImpl implements IPaymentServices {
         if (p.getStatus() != PaymentStatus.PENDING || (input.getStatus() != PaymentStatus.PAID && input.getStatus() != PaymentStatus.FAILED))
             throw BusinessException.conflict("Transitions autorisées : PENDING vers PAID ou FAILED ; remboursement via /refunds");
         p.setStatus(input.getStatus());
-        if (input.getStatus() == PaymentStatus.PAID) p.setPaidAt(LocalDateTime.now());
+        if (input.getStatus() == PaymentStatus.PAID) p.setPaidAt(LocalDateTime.now(ZoneId.systemDefault()));
         log.info("Statut du paiement modifié : id={}, statut={}", id, p.getStatus());
         return p;
     }
@@ -79,7 +83,7 @@ public class PaymentServicesImpl implements IPaymentServices {
             throw BusinessException.conflict("Seul un paiement encaissé et non totalement remboursé est remboursable");
         BigDecimal total = p.getRefundedAmount().add(input.getAmount());
         if (total.compareTo(p.getAmount()) > 0) throw BusinessException.conflict("Remboursement supérieur au montant restant");
-        Refund r = new Refund(); r.setPayment(p); r.setAmount(input.getAmount()); r.setReason(input.getReason()); r.setRefundDate(LocalDateTime.now());
+        Refund r = new Refund(); r.setPayment(p); r.setAmount(input.getAmount()); r.setReason(input.getReason()); r.setRefundDate(LocalDateTime.now(ZoneId.systemDefault()));
         p.setRefundedAmount(total); p.setStatus(total.compareTo(p.getAmount()) == 0 ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
         Refund saved = refunds.save(r);
         log.info("Remboursement enregistré : paiement={}, montant={}, statut={}",
@@ -107,7 +111,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Override
     @Transactional(readOnly = true)
     public List<Refund> refunds(Long id) {
-        get(id);
+        find(id);
         List<Refund> result = refunds.findByPayment_Id(id);
         log.debug("Remboursements récupérés : paiement={}, nombre={}", id, result.size());
         return result;
@@ -115,7 +119,7 @@ public class PaymentServicesImpl implements IPaymentServices {
     @Override
     @Transactional(readOnly = true)
     public PaymentReceipt receipt(Long id) {
-        Payment p = get(id);
+        Payment p = find(id);
         PaymentReceipt receipt = new PaymentReceipt(p.getReceiptNumber(), p.getId(), p.getSkier().getNumSkier(),
                 p.getSkier().getFirstName() + " " + p.getSkier().getLastName(), p.getSubscription().getNumSub(),
                 p.getPaymentDate(), p.getPaidAt(), p.getMethod(), p.getStatus(), p.getAmount(), p.getRefundedAmount(),

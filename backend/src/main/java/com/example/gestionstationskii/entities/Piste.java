@@ -32,6 +32,6 @@ public class Piste implements Serializable {
 
 	@JsonIgnore
 	@ManyToMany(mappedBy= "pistes")
-	Set<Skier> skiers;
+	private Set<Skier> skiers;
 
 }

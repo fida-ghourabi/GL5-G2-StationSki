@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CourseServicesMockTest {
 
     @Mock
@@ -41,6 +44,13 @@ class CourseServicesMockTest {
 
         assertEquals(2, result.size());
         verify(courseRepository, times(1)).findAll();
+    }
+
+    @Test
+    void retrieveAllCoursesReturnsEmptyList() {
+        when(courseRepository.findAll()).thenReturn(Collections.<Course>emptyList());
+
+        assertTrue(courseServices.retrieveAllCourses().isEmpty());
     }
 
     @Test
@@ -92,6 +102,16 @@ class CourseServicesMockTest {
     }
 
     @Test
+    void updateCourseThrowsWhenMissing() {
+        Course update = buildCourse();
+        update.setNumCourse(99L);
+        when(courseRepository.lockById(99L)).thenReturn(Optional.<Course>empty());
+
+        assertThrows(BusinessException.class, () -> courseServices.updateCourse(update));
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
     void removeCourseDeletesWhenNoLinks() {
         Course course = buildCourse();
         course.setNumCourse(1L);
@@ -110,6 +130,27 @@ class CourseServicesMockTest {
         course.setNumCourse(1L);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(1L));
+        verify(courseRepository, never()).delete(any(Course.class));
+    }
+
+    @Test
+    void removeCourseThrowsWhenMissing() {
+        when(courseRepository.findById(99L)).thenReturn(Optional.<Course>empty());
+
+        assertThrows(BusinessException.class, () -> courseServices.removeCourse(99L));
+        verify(courseRepository, never()).delete(any(Course.class));
+    }
+
+    @Test
+    void removeCourseRefusedWhenInstructorAssigned() {
+        Course course = buildCourse();
+        course.setNumCourse(1L);
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+        when(registrationRepository.existsByCourse_NumCourse(1L)).thenReturn(false);
+        when(instructorRepository.findByCourses_NumCourse(1L))
+                .thenReturn(Collections.singletonList(new Instructor()));
 
         assertThrows(BusinessException.class, () -> courseServices.removeCourse(1L));
         verify(courseRepository, never()).delete(any(Course.class));

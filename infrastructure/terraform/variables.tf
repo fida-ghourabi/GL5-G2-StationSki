@@ -30,13 +30,13 @@ variable "cluster_name" {
 variable "cluster_iam_role_arn" {
   description = "Existing IAM role ARN used by the EKS control plane."
   type        = string
-  default     = "arn:aws:iam::642179879357:role/LabRole"
+  default     = "arn:aws:iam::085397751671:role/LabRole"
 }
 
 variable "node_iam_role_arn" {
   description = "Existing IAM role ARN used by the EKS managed node group."
   type        = string
-  default     = "arn:aws:iam::642179879357:role/LabRole"
+  default     = "arn:aws:iam::085397751671:role/LabRole"
 }
 
 variable "kubernetes_version" {

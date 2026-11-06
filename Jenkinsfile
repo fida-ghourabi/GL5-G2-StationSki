@@ -316,12 +316,94 @@ pipeline {
         }
 
         /*
-         * Frontend CI stages run after both backend checks and before any
-         * release artifact is published. This keeps the existing backend
-         * deployment flow unchanged while requiring the frontend checks to
-         * pass before the monorepo pipeline proceeds.
+         * ============================================================
+         * Backend packaging, publication and image stages
+         * ============================================================
          */
-        /* Stage 6 : installation des dépendances frontend. */
+        stage('PUBLISH BACKEND TO NEXUS') {
+            when {
+                expression {
+                    !params.DESTROY_AWS_INFRASTRUCTURE_ONLY &&
+                    !params.PUBLISH_MAVEN_RELEASE
+                }
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'nexus-credentials',
+                        usernameVariable: 'NEXUS_USERNAME',
+                        passwordVariable: 'NEXUS_PASSWORD'
+                    )
+                ]) {
+                    configFileProvider([
+                        configFile(
+                            fileId: 'maven-settings',
+                            variable: 'MAVEN_SETTINGS'
+                        )
+                    ]) {
+                        dir('backend') {
+                            sh '''
+                                mvn deploy \
+                                    -DskipTests \
+                                    -s "$MAVEN_SETTINGS" \
+                                    -Dnexus.url="$NEXUS_URL"
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('BUILD BACKEND IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                dir('backend') {
+                    script {
+                        def builtImage = docker.build(
+                            "${DOCKER_IMAGE}:${IMAGE_TAG}",
+                            "."
+                        )
+                        builtImage.tag('latest')
+                    }
+                }
+            }
+        }
+
+        stage('PUBLISH BACKEND IMAGE') {
+            when {
+                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
+            }
+            steps {
+                script {
+                    docker.withRegistry(
+                        'https://index.docker.io/v1/',
+                        'dockerhub-credentials'
+                    ) {
+                        docker.image(
+                            "${DOCKER_IMAGE}:${IMAGE_TAG}"
+                        ).push()
+                        docker.image(
+                            "${DOCKER_IMAGE}:latest"
+                        ).push()
+
+                        sh """
+                            docker image rm ${DOCKER_IMAGE}:${IMAGE_TAG} || true
+                            docker pull ${DOCKER_IMAGE}:${IMAGE_TAG}
+                            docker image inspect ${DOCKER_IMAGE}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+        }
+
+        /*
+         * ============================================================
+         * Frontend CI, packaging, publication and image stages
+         * ============================================================
+         */
+        /* Stage 11 : installation des dépendances frontend. */
         stage('FRONTEND INSTALL') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -340,7 +422,7 @@ pipeline {
             }
         }
 
-        /* Stage 7 : tests unitaires frontend et rapport de couverture. */
+        /* Stage 12 : tests unitaires frontend et rapport de couverture. */
         stage('FRONTEND UNIT TESTS') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -364,7 +446,7 @@ pipeline {
             }
         }
 
-        /* Stage 8 : compilation de l'application Angular. */
+        /* Stage 13 : compilation de l'application Angular. */
         stage('FRONTEND BUILD') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -382,7 +464,7 @@ pipeline {
             }
         }
 
-        /* Stage 9 : analyse SonarQube et Quality Gate frontend. */
+        /* Stage 14 : analyse SonarQube et Quality Gate frontend. */
         stage('FRONTEND SONARQUBE') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -414,7 +496,7 @@ pipeline {
             }
         }
 
-        /* Stage 10 : publication de l'archive statique frontend dans Nexus. */
+        /* Stage 15 : publication de l'archive statique frontend dans Nexus. */
         stage('FRONTEND PUBLISH TO NEXUS') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -466,7 +548,7 @@ pipeline {
             }
         }
 
-        /* Stage 11 : construction de l'image frontend. */
+        /* Stage 16 : construction de l'image frontend. */
         stage('BUILD FRONTEND IMAGE') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -483,7 +565,7 @@ pipeline {
             }
         }
 
-        /* Stage 12 : publication des tags versionné et latest. */
+        /* Stage 17 : publication des tags versionné et latest. */
         stage('PUBLISH FRONTEND IMAGE TO DOCKER HUB') {
             when {
                 expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
@@ -500,24 +582,8 @@ pipeline {
                         docker.image(
                             "${FRONTEND_DOCKER_IMAGE}:latest"
                         ).push()
-                    }
-                }
-            }
-        }
 
-        /* Stage 13 : pull et inspection de l'image publiée. */
-        stage('VERIFY FRONTEND DOCKER HUB IMAGE') {
-            when {
-                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
-            }
-            steps {
-                script {
-                    docker.withRegistry(
-                        'https://index.docker.io/v1/',
-                        'dockerhub-credentials'
-                    ) {
                         sh """
-                            set +x
                             docker image rm ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG} || true
                             docker pull ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}
                             docker image inspect ${FRONTEND_DOCKER_IMAGE}:${IMAGE_TAG}
@@ -529,217 +595,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 14 : PUBLISH TO NEXUS
-         * ============================================================
-         *
-         * Publie le fichier JAR dans Nexus.
-         *
-         * Comme la version du projet est :
-         *
-         * 0.0.1-SNAPSHOT
-         *
-         * Maven publiera l'artefact dans maven-snapshots.
-         */
-        stage('PUBLISH TO NEXUS') {
-            when {
-                expression {
-                    !params.DESTROY_AWS_INFRASTRUCTURE_ONLY &&
-                    !params.PUBLISH_MAVEN_RELEASE
-                }
-            }
-            steps {
-                /*
-                 * Récupère temporairement les credentials Nexus
-                 * enregistrés dans Jenkins sous :
-                 *
-                 * nexus-credentials
-                 */
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'nexus-credentials',
-                        usernameVariable: 'NEXUS_USERNAME',
-                        passwordVariable: 'NEXUS_PASSWORD'
-                    )
-                ]) {
-                    /*
-                     * Récupère temporairement le fichier Maven
-                     * enregistré dans Jenkins sous :
-                     *
-                     * maven-settings
-                     */
-                    configFileProvider([
-                        configFile(
-                            fileId: 'maven-settings',
-                            variable: 'MAVEN_SETTINGS'
-                        )
-                    ]) {
-                        dir('backend') {
-                            /*
-                             * deploy :
-                             * - construit le package ;
-                             * - publie le JAR dans Nexus.
-                             *
-                             * -s indique à Maven d'utiliser le settings.xml
-                             * fourni temporairement par Jenkins.
-                             *
-                             * -Dnexus.url transmet l'URL de Nexus
-                             * au pom.xml.
-                             */
-                            sh '''
-                                mvn deploy \
-                                    -DskipTests \
-                                    -s "$MAVEN_SETTINGS" \
-                                    -Dnexus.url="$NEXUS_URL"
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-
-        /*
-         * ============================================================
-         * Stage 15 : BUILDING BACKEND IMAGE
-         * ============================================================
-         *
-         * Construit l'image Docker depuis backend/Dockerfile.
-         *
-         * Le Dockerfile copie le JAR généré dans :
-         *
-         * backend/target/
-         */
-        stage('BUILDING OUR IMAGE') {
-            when {
-                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
-            }
-            steps {
-                dir('backend') {
-                    script {
-                        /*
-                         * Construit l'image avec un tag versionné.
-                         *
-                         * Exemple :
-                         * fidagh/gestion-station-skii-backend:15
-                         */
-                        def builtImage = docker.build(
-                            "${DOCKER_IMAGE}:${IMAGE_TAG}",
-                            "."
-                        )
-
-                        /*
-                         * Ajoute également le tag latest
-                         * à la même image locale.
-                         */
-                        builtImage.tag('latest')
-                    }
-                }
-            }
-        }
-
-        /*
-         * ============================================================
-         * Stage 16 : PUBLISH BACKEND IMAGE
-         * ============================================================
-         *
-         * Se connecte à Docker Hub et pousse les deux tags :
-         *
-         * - BUILD_NUMBER
-         * - latest
-         *
-         * Le credential Jenkins utilisé est :
-         *
-         * dockerhub-credentials
-         */
-        stage('DEPLOY OUR IMAGE') {
-            when {
-                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
-            }
-            steps {
-                script {
-                    /*
-                     * docker.withRegistry gère automatiquement
-                     * la connexion à Docker Hub avec le credential Jenkins.
-                     *
-                     * Le credential doit être de type :
-                     * Username with password
-                     *
-                     * Le champ Password doit contenir
-                     * un Access Token Docker Hub.
-                     */
-                    docker.withRegistry(
-                        'https://index.docker.io/v1/',
-                        'dockerhub-credentials'
-                    ) {
-                        /*
-                         * Récupère la référence vers l'image
-                         * construite dans BUILDING OUR IMAGE.
-                         */
-                        def versionedImage = docker.image(
-                            "${DOCKER_IMAGE}:${IMAGE_TAG}"
-                        )
-
-                        def latestImage = docker.image(
-                            "${DOCKER_IMAGE}:latest"
-                        )
-
-                        /*
-                         * Envoie l'image versionnée sur Docker Hub.
-                         */
-                        versionedImage.push()
-
-                        /*
-                         * Envoie également le tag latest.
-                         */
-                        latestImage.push()
-                    }
-                }
-            }
-        }
-
-        /*
-         * ============================================================
-         * Stage 17 : VERIFY BACKEND DOCKER HUB IMAGE
-         * ============================================================
-         *
-         * Vérifie que l'image peut réellement être récupérée
-         * depuis Docker Hub.
-         */
-        stage('VERIFY DOCKER HUB IMAGE') {
-            when {
-                expression { !params.DESTROY_AWS_INFRASTRUCTURE_ONLY }
-            }
-            steps {
-                script {
-                    /*
-                     * Utilise le même credential pour accéder
-                     * à Docker Hub pendant le pull.
-                     */
-                    docker.withRegistry(
-                        'https://index.docker.io/v1/',
-                        'dockerhub-credentials'
-                    ) {
-                        sh """
-                            # Supprime le tag local versionné.
-                            # Le tag latest reste local mais n'est pas utilisé.
-                            docker image rm \
-                                ${DOCKER_IMAGE}:${IMAGE_TAG} || true
-
-                            # Récupère l'image depuis Docker Hub.
-                            docker pull \
-                                ${DOCKER_IMAGE}:${IMAGE_TAG}
-
-                            # Vérifie les métadonnées de l'image récupérée.
-                            docker image inspect \
-                                ${DOCKER_IMAGE}:${IMAGE_TAG}
-                        """
-                    }
-                }
-            }
-        }
-
-        /*
-         * ============================================================
-         * Stage 18 : TEST AWS CREDENTIALS
+         * Stage 19 : TEST AWS CREDENTIALS
          * ============================================================
          *
          * Vérifie l'identité AWS du Learner Lab sans créer
@@ -773,7 +629,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 19 : DESTROY AWS INFRASTRUCTURE ONLY (OPTIONAL)
+         * Stage 20 : DESTROY AWS INFRASTRUCTURE ONLY (OPTIONAL)
          * ============================================================
          *
          * Ce stage n'est exécuté que si le paramètre de suppression seule
@@ -832,7 +688,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 20 : SETUP TERRAFORM
+         * Stage 21 : SETUP TERRAFORM
          * ============================================================
          *
          * Regroupe le cycle Terraform comme dans le pipeline de
@@ -892,7 +748,7 @@ pipeline {
 
         /*
          * ============================================================
-         * Stage 21 : UPDATE KUBECONFIG
+         * Stage 22 : UPDATE KUBECONFIG
          * ============================================================
          *
          * Configure kubectl pour le cluster créé par Terraform.
@@ -1004,7 +860,7 @@ pipeline {
         }
 
         /*
-         * Stage 22 : déploiement et vérification du frontend dans EKS.
+         * Stage 24 : déploiement et vérification du frontend dans EKS.
          * Le test HTTP interne passe par le Service frontend et son proxy Nginx.
          */
         stage('DEPLOY FRONTEND TO AWS KUBERNETES') {

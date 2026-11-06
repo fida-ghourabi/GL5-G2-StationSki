@@ -1086,13 +1086,29 @@ pipeline {
                         fi
 
                         echo "Classic Load Balancer hostname: $lb_hostname"
-                        curl --fail --show-error --silent --retry 8 \\
-                            --retry-all-errors --retry-delay 5 --max-time 20 \\
-                            "http://$lb_hostname/healthz" >/dev/null
-                        curl --fail --show-error --silent --retry 8 \\
-                            --retry-all-errors --retry-delay 5 --max-time 20 \\
-                            "http://$lb_hostname/stationSki/actuator/health/readiness"
-                        echo "Frontend and backend API are reachable through the Classic Load Balancer."
+
+                        max_attempts=36
+                        attempt=1
+                        while [ "$attempt" -le "$max_attempts" ]; do
+                            echo "Checking Load Balancer readiness (attempt $attempt/$max_attempts)..."
+
+                            if curl --fail --show-error --silent --retry 1 \\
+                                --retry-all-errors --max-time 20 \\
+                                "http://$lb_hostname/healthz" >/dev/null &&
+                               curl --fail --show-error --silent --retry 1 \\
+                                --retry-all-errors --max-time 20 \\
+                                "http://$lb_hostname/stationSki/actuator/health/readiness" >/dev/null; then
+                                echo "Frontend and backend API are reachable through the Classic Load Balancer."
+                                exit 0
+                            fi
+
+                            echo "Load Balancer DNS or application is not ready yet; retrying in 10 seconds."
+                            sleep 10
+                            attempt=$((attempt + 1))
+                        done
+
+                        echo "Load Balancer was not reachable after 6 minutes."
+                        exit 1
                     '''
                 }
             }
